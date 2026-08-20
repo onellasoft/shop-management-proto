@@ -1,0 +1,22 @@
+[
+  { "id": "c_1", "name": "Aarav Sharma", "mobile": "+91 98765 12345", "email": "aarav.sharma@gmail.com", "city": "Mumbai", "tags": ["VIP", "Regular"], "status": "Active" },
+  { "id": "c_2", "name": "Aditi Verma", "mobile": "+91 98123 78901", "email": "aditi.v@yahoo.com", "city": "Delhi", "tags": ["New Lead"], "status": "Active" },
+  { "id": "c_3", "name": "Rohan Gupta", "mobile": "+91 99887 66554", "email": "rohan.g@outlook.com", "city": "Bangalore", "tags": ["Inactive Customer"], "status": "Inactive" },
+  { "id": "c_4", "name": "Sneha Reddy", "mobile": "+91 91234 98765", "email": "sneha.reddy@gmail.com", "city": "Hyderabad", "tags": ["VIP"], "status": "Active" },
+  { "id": "c_5", "name": "Vikram Singh", "mobile": "+91 95432 67890", "email": "vikram.s@hotmail.com", "city": "Jaipur", "tags": ["Wholesaler"], "status": "Active" },
+  { "id": "c_6", "name": "Pooja Patel", "mobile": "+91 96543 98765", "email": "pooja.patel@gmail.com", "city": "Ahmedabad", "tags": ["Retailer"], "status": "Active" },
+  { "id": "c_7", "name": "Arjun Nair", "mobile": "+91 97654 87654", "email": "arjun.nair@gmail.com", "city": "Kochi", "tags": ["Regular"], "status": "Active" },
+  { "id": "c_8", "name": "Kriti Das", "mobile": "+91 98765 98765", "email": "kriti.das@gmail.com", "city": "Kolkata", "tags": ["New Lead"], "status": "Inactive" },
+  { "id": "c_9", "name": "Manish Joshi", "mobile": "+91 99000 88888", "email": "manish.j@rediffmail.com", "city": "Pune", "tags": ["VIP"], "status": "Active" },
+  { "id": "c_10", "name": "Deepa Rao", "mobile": "+91 99111 22222", "email": "deepa.rao@gmail.com", "city": "Chennai", "tags": ["Regular", "Loyal"], "status": "Active" },
+  { "id": "c_11", "name": "Harish Kumar", "mobile": "+91 98450 98450", "email": "harish.k@gmail.com", "city": "Bangalore", "tags": ["VIP"], "status": "Active" },
+  { "id": "c_12", "name": "Neha Gupta", "mobile": "+91 98100 98100", "email": "neha.g@gmail.com", "city": "Delhi", "tags": ["Regular"], "status": "Active" },
+  { "id": "c_13", "name": "Siddharth Sen", "mobile": "+91 98300 98300", "email": "sid.sen@gmail.com", "city": "Kolkata", "tags": ["Inactive Customer"], "status": "Inactive" },
+  { "id": "c_14", "name": "Ananya Hegde", "mobile": "+91 98860 98860", "email": "ananya.h@gmail.com", "city": "Bangalore", "tags": ["Loyal"], "status": "Active" },
+  { "id": "c_15", "name": "Gaurav Malhotra", "mobile": "+91 99100 99100", "email": "gaurav.m@gmail.com", "city": "Noida", "tags": ["New Lead"], "status": "Active" },
+  { "id": "c_16", "name": "Karan Johar", "mobile": "+91 98200 98200", "email": "karan.j@gmail.com", "city": "Mumbai", "tags": ["Regular"], "status": "Active" },
+  { "id": "c_17", "name": "Shweta Tiwari", "mobile": "+91 98900 98900", "email": "shweta.t@gmail.com", "city": "Pune", "tags": ["VIP"], "status": "Active" },
+  { "id": "c_18", "name": "Abhishek Bachchan", "mobile": "+91 98210 98210", "email": "abhishek.b@gmail.com", "city": "Mumbai", "tags": ["Retailer"], "status": "Active" },
+  { "id": "c_19", "name": "Preity Zinta", "mobile": "+91 98140 98140", "email": "preity.z@gmail.com", "city": "Mohali", "tags": ["VIP"], "status": "Active" },
+  { "id": "c_20", "name": "Rahul Dravid", "mobile": "+91 98440 98440", "email": "rahul.d@gmail.com", "city": "Bangalore", "tags": ["Regular"], "status": "Active" }
+]

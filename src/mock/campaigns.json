@@ -1,0 +1,62 @@
+[
+  {
+    "id": "cmp_1",
+    "name": "EID Mubarak Mubarak Promo",
+    "template": "festival_sale",
+    "group": "VIP Customers",
+    "status": "Completed",
+    "scheduledDate": "2025-06-15 10:00 AM",
+    "sentCount": 150,
+    "delivered": 148,
+    "read": 132,
+    "failed": 2
+  },
+  {
+    "id": "cmp_2",
+    "name": "Welcome Series June",
+    "template": "welcome_message",
+    "group": "New Signups",
+    "status": "Active",
+    "scheduledDate": "Ongoing (Triggered)",
+    "sentCount": 420,
+    "delivered": 418,
+    "read": 380,
+    "failed": 2
+  },
+  {
+    "id": "cmp_3",
+    "name": "Flash Sale Weekend",
+    "template": "welcome_message",
+    "group": "All Retailers",
+    "status": "Completed",
+    "scheduledDate": "2025-06-22 06:00 PM",
+    "sentCount": 85,
+    "delivered": 84,
+    "read": 78,
+    "failed": 1
+  },
+  {
+    "id": "cmp_4",
+    "name": "OTP Alerts Auth",
+    "template": "otp_verification",
+    "group": "Transactional",
+    "status": "Active",
+    "scheduledDate": "Ongoing (API)",
+    "sentCount": 1250,
+    "delivered": 1248,
+    "read": 1240,
+    "failed": 2
+  },
+  {
+    "id": "cmp_5",
+    "name": "Cart Recovery Mailer",
+    "template": "cart_abandonment",
+    "group": "Abandoned Carts",
+    "status": "Draft",
+    "scheduledDate": "Immediate",
+    "sentCount": 0,
+    "delivered": 0,
+    "read": 0,
+    "failed": 0
+  }
+]

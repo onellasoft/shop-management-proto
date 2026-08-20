@@ -1,0 +1,7 @@
+[
+  { "id": "msg_1", "contactName": "Aarav Sharma", "mobile": "+91 98765 12345", "templateName": "welcome_message", "status": "Read", "timestamp": "2025-06-29 10:15 AM" },
+  { "id": "msg_2", "contactName": "Aditi Verma", "mobile": "+91 98123 78901", "templateName": "welcome_message", "status": "Delivered", "timestamp": "2025-06-29 10:16 AM" },
+  { "id": "msg_3", "contactName": "Rohan Gupta", "mobile": "+91 99887 66554", "templateName": "payment_reminder", "status": "Read", "timestamp": "2025-06-29 11:30 AM" },
+  { "id": "msg_4", "contactName": "Sneha Reddy", "mobile": "+91 91234 98765", "templateName": "otp_verification", "status": "Failed", "timestamp": "2025-06-29 11:45 AM" },
+  { "id": "msg_5", "contactName": "Vikram Singh", "mobile": "+91 95432 67890", "templateName": "order_confirmation", "status": "Read", "timestamp": "2025-06-29 12:00 PM" }
+]

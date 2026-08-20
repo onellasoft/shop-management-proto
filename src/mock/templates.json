@@ -1,0 +1,102 @@
+[
+  {
+    "id": "tpl_1",
+    "name": "welcome_message",
+    "category": "Marketing",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Hello {{name}}, welcome to our shop! We are thrilled to have you here. Use code WELCOME10 for 10% off your first purchase.",
+    "variables": ["name"],
+    "lastModified": "2025-06-01"
+  },
+  {
+    "id": "tpl_2",
+    "name": "order_confirmation",
+    "category": "Utility",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Hi {{name}}, your order {{order_id}} of {{amount}} has been confirmed and will be shipped shortly. Track status here: {{track_link}}.",
+    "variables": ["name", "order_id", "amount", "track_link"],
+    "lastModified": "2025-06-03"
+  },
+  {
+    "id": "tpl_3",
+    "name": "otp_verification",
+    "category": "Authentication",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Your verification code is {{otp}}. This code is valid for 5 minutes. Do not share it with anyone.",
+    "variables": ["otp"],
+    "lastModified": "2025-05-20"
+  },
+  {
+    "id": "tpl_4",
+    "name": "festival_sale",
+    "category": "Marketing",
+    "language": "Hindi (IN)",
+    "status": "Approved",
+    "body": "नमस्ते {{name}}! इस दीवाली पाइए कपड़ों पर 50% तक की भारी छूट। अभी आएं हमारे स्टोर पर: {{store_link}}",
+    "variables": ["name", "store_link"],
+    "lastModified": "2025-06-15"
+  },
+  {
+    "id": "tpl_5",
+    "name": "payment_reminder",
+    "category": "Utility",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Dear {{name}}, this is a friendly reminder that invoice {{invoice_no}} for {{amount}} is due on {{due_date}}. Pay here: {{pay_link}}",
+    "variables": ["name", "invoice_no", "amount", "due_date", "pay_link"],
+    "lastModified": "2025-06-10"
+  },
+  {
+    "id": "tpl_6",
+    "name": "delivery_status",
+    "category": "Utility",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Hey {{name}}, your package from {{shop_name}} has been delivered. We hope you love your purchase!",
+    "variables": ["name", "shop_name"],
+    "lastModified": "2025-06-12"
+  },
+  {
+    "id": "tpl_7",
+    "name": "cart_abandonment",
+    "category": "Marketing",
+    "language": "English (US)",
+    "status": "Pending",
+    "body": "Hi {{name}}, you left items in your cart! Complete your purchase in the next 24 hours to get free shipping: {{cart_link}}",
+    "variables": ["name", "cart_link"],
+    "lastModified": "2025-06-29"
+  },
+  {
+    "id": "tpl_8",
+    "name": "feedback_request",
+    "category": "Utility",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Hi {{name}}, how was your recent shopping experience with {{shop_name}}? Rate us here: {{rate_link}}",
+    "variables": ["name", "shop_name", "rate_link"],
+    "lastModified": "2025-06-25"
+  },
+  {
+    "id": "tpl_9",
+    "name": "birthday_wish",
+    "category": "Marketing",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Happy Birthday {{name}}! 🎂 Celebrate your special day with a special 20% discount coupon from us: {{coupon_code}}",
+    "variables": ["name", "coupon_code"],
+    "lastModified": "2025-06-08"
+  },
+  {
+    "id": "tpl_10",
+    "name": "appointment_booking",
+    "category": "Utility",
+    "language": "English (US)",
+    "status": "Approved",
+    "body": "Hi {{name}}, your appointment with {{agent}} is confirmed for {{datetime}} at our outlet {{address}}.",
+    "variables": ["name", "agent", "datetime", "address"],
+    "lastModified": "2025-06-11"
+  }
+]

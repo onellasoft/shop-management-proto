@@ -1,0 +1,422 @@
+[
+  {
+    "id": "biz_1",
+    "name": "Apex Electronics",
+    "owner": "Rohan Sharma",
+    "mobile": "+91 98765 43210",
+    "email": "rohan@apexelectronics.com",
+    "subscription": "Enterprise",
+    "status": "Active",
+    "createdDate": "2025-01-10",
+    "logo": "AE",
+    "gst": "27AAAAA1111A1Z1",
+    "pan": "ABCDE1234F",
+    "address": "102, Sunrise Business Park, Andheri East, Mumbai, Maharashtra 400069",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "POS", "AI Assistant", "Reports"],
+    "usage": {
+      "storageUsed": 45.2,
+      "messagesSent": 34200,
+      "whatsappAccountsConnected": 4
+    }
+  },
+  {
+    "id": "biz_2",
+    "name": "Organic Grocers",
+    "owner": "Priya Patel",
+    "mobile": "+91 98123 45678",
+    "email": "priya@organicgrocers.in",
+    "subscription": "Professional",
+    "status": "Active",
+    "createdDate": "2025-02-15",
+    "logo": "OG",
+    "gst": "24BBBBB2222B2Z2",
+    "pan": "FGHIJ5678K",
+    "address": "Shop 4, Green Arcade, Satellite Road, Ahmedabad, Gujarat 380015",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "POS", "Reports"],
+    "usage": {
+      "storageUsed": 12.8,
+      "messagesSent": 8900,
+      "whatsappAccountsConnected": 2
+    }
+  },
+  {
+    "id": "biz_3",
+    "name": "Nova Fashion Boutique",
+    "owner": "Anjali Sen",
+    "mobile": "+91 97777 88888",
+    "email": "contact@novafashion.com",
+    "subscription": "Starter",
+    "status": "Pending KYC",
+    "createdDate": "2025-06-01",
+    "logo": "NF",
+    "gst": "19CCCCC3333C3Z3",
+    "pan": "LMNOP9012Q",
+    "address": "Sector 5, Salt Lake City, Kolkata, West Bengal 700091",
+    "kycStatus": "Pending",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Billing"],
+    "usage": {
+      "storageUsed": 2.1,
+      "messagesSent": 450,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_4",
+    "name": "Decent Pharmacy",
+    "owner": "Vikram Malhotra",
+    "mobile": "+91 99888 77665",
+    "email": "vikram@decentpharmacy.co.in",
+    "subscription": "Professional",
+    "status": "Active",
+    "createdDate": "2025-03-05",
+    "logo": "DP",
+    "gst": "07DDDDD4444D4Z4",
+    "pan": "RSTUV3456W",
+    "address": "G-12, Green Park Main, New Delhi 110016",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "Reports"],
+    "usage": {
+      "storageUsed": 18.5,
+      "messagesSent": 9500,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_5",
+    "name": "Zeta Furniture Studio",
+    "owner": "Kabir Mehta",
+    "mobile": "+91 91234 56789",
+    "email": "kabir@zetafurniture.com",
+    "subscription": "Custom",
+    "status": "Active",
+    "createdDate": "2025-04-20",
+    "logo": "ZF",
+    "gst": "29EEEEE5555E5Z5",
+    "pan": "XYZAB7890C",
+    "address": "80 Feet Road, Koramangala, Bangalore, Karnataka 560034",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "POS", "AI Assistant", "Reports"],
+    "usage": {
+      "storageUsed": 120.4,
+      "messagesSent": 74300,
+      "whatsappAccountsConnected": 6
+    }
+  },
+  {
+    "id": "biz_6",
+    "name": "Gourmet Bites Cafe",
+    "owner": "Ritu Verma",
+    "mobile": "+91 95432 10987",
+    "email": "ritu@gourmetbites.in",
+    "subscription": "Starter",
+    "status": "Suspended",
+    "createdDate": "2025-01-28",
+    "logo": "GB",
+    "gst": "27FFFFF6666F6Z6",
+    "pan": "DEFGH1234I",
+    "address": "Shop 12, Carter Road, Bandra West, Mumbai, Maharashtra 400050",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Billing", "POS", "CRM"],
+    "usage": {
+      "storageUsed": 4.8,
+      "messagesSent": 1200,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_7",
+    "name": "Spark Auto Parts",
+    "owner": "Harpreet Singh",
+    "mobile": "+91 96543 21098",
+    "email": "harpreet@sparkauto.com",
+    "subscription": "Professional",
+    "status": "Pending KYC",
+    "createdDate": "2025-06-15",
+    "logo": "SA",
+    "gst": "03GGGGG7777G7Z7",
+    "pan": "JKLMN5678O",
+    "address": "GT Road, Ludhiana, Punjab 141008",
+    "kycStatus": "Pending",
+    "modulesEnabled": ["Inventory", "Billing", "POS", "Reports"],
+    "usage": {
+      "storageUsed": 8.1,
+      "messagesSent": 300,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_8",
+    "name": "Blue Whale Logistics",
+    "owner": "Aditya Rao",
+    "mobile": "+91 97654 32109",
+    "email": "aditya@bluewhalelogistics.com",
+    "subscription": "Enterprise",
+    "status": "Active",
+    "createdDate": "2025-02-02",
+    "logo": "BW",
+    "gst": "33HHHHH8888H8Z8",
+    "pan": "PQRST9012U",
+    "address": "Mount Road, Chennai, Tamil Nadu 600002",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "AI Assistant", "Reports"],
+    "usage": {
+      "storageUsed": 55.6,
+      "messagesSent": 15600,
+      "whatsappAccountsConnected": 3
+    }
+  },
+  {
+    "id": "biz_9",
+    "name": "Elite Fitness Gym",
+    "owner": "Rahul Joshi",
+    "mobile": "+91 98765 09876",
+    "email": "rahul@elitefitness.co.in",
+    "subscription": "Starter",
+    "status": "Active",
+    "createdDate": "2025-05-10",
+    "logo": "EF",
+    "gst": "27IIIII9999I9Z9",
+    "pan": "VWXYZ3456A",
+    "address": "Viman Nagar, Pune, Maharashtra 411014",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Billing"],
+    "usage": {
+      "storageUsed": 3.9,
+      "messagesSent": 2100,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_10",
+    "name": "Rainbow Kids Wear",
+    "owner": "Sneha Reddy",
+    "mobile": "+91 99000 11223",
+    "email": "sneha@rainbowwear.com",
+    "subscription": "Starter",
+    "status": "Pending KYC",
+    "createdDate": "2025-06-25",
+    "logo": "RK",
+    "gst": "36JJJJJ0000J0Z0",
+    "pan": "BCDEF7890G",
+    "address": "Banjara Hills, Hyderabad, Telangana 500034",
+    "kycStatus": "Pending",
+    "modulesEnabled": ["Bulk WhatsApp", "Billing"],
+    "usage": {
+      "storageUsed": 0.5,
+      "messagesSent": 50,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_11",
+    "name": "Horizon Tech Solutions",
+    "owner": "Nikhil Deshmukh",
+    "mobile": "+91 98900 12345",
+    "email": "nikhil@horizontech.com",
+    "subscription": "Professional",
+    "status": "Active",
+    "createdDate": "2025-03-12",
+    "logo": "HT",
+    "gst": "27KKKKK1111K1ZA",
+    "pan": "HIJKL2345M",
+    "address": "IT Park, Hinjewadi, Pune, Maharashtra 411057",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Reports", "Billing"],
+    "usage": {
+      "storageUsed": 15.1,
+      "messagesSent": 7500,
+      "whatsappAccountsConnected": 2
+    }
+  },
+  {
+    "id": "biz_12",
+    "name": "Golden Harvest Seeds",
+    "owner": "Rajesh Kumar",
+    "mobile": "+91 94400 98765",
+    "email": "rajesh@goldenharvest.in",
+    "subscription": "Starter",
+    "status": "Active",
+    "createdDate": "2025-04-01",
+    "logo": "GH",
+    "gst": "09LLLLL2222L2ZB",
+    "pan": "NOPQR6789S",
+    "address": "Civil Lines, Kanpur, Uttar Pradesh 208001",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["CRM", "Billing", "Inventory"],
+    "usage": {
+      "storageUsed": 4.2,
+      "messagesSent": 1800,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_13",
+    "name": "Luxe Salon & Spa",
+    "owner": "Meera Nair",
+    "mobile": "+91 98450 12345",
+    "email": "meera@luxesalon.co.in",
+    "subscription": "Professional",
+    "status": "Active",
+    "createdDate": "2025-02-18",
+    "logo": "LS",
+    "gst": "32MMMMM3333M3ZC",
+    "pan": "TUVWX0123Y",
+    "address": "MG Road, Kochi, Kerala 682016",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "POS", "Billing", "Reports"],
+    "usage": {
+      "storageUsed": 22.4,
+      "messagesSent": 14300,
+      "whatsappAccountsConnected": 2
+    }
+  },
+  {
+    "id": "biz_14",
+    "name": "Oceanic Seafoods",
+    "owner": "George Kutty",
+    "mobile": "+91 94440 11223",
+    "email": "george@oceanicsea.com",
+    "subscription": "Enterprise",
+    "status": "Active",
+    "createdDate": "2025-01-20",
+    "logo": "OS",
+    "gst": "29NNNNN4444N4ZD",
+    "pan": "ZABCD4567E",
+    "address": "Panampilly Nagar, Kochi, Kerala 682036",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "POS", "Reports"],
+    "usage": {
+      "storageUsed": 48.9,
+      "messagesSent": 28900,
+      "whatsappAccountsConnected": 3
+    }
+  },
+  {
+    "id": "biz_15",
+    "name": "Craft & Clay Pottery",
+    "owner": "Rhea Das",
+    "mobile": "+91 98300 55667",
+    "email": "rhea@craftandclay.in",
+    "subscription": "Starter",
+    "status": "Pending KYC",
+    "createdDate": "2025-06-28",
+    "logo": "CC",
+    "gst": "19OOOOO5555O5ZE",
+    "pan": "FGHIJ8901K",
+    "address": "Park Street, Kolkata, West Bengal 700016",
+    "kycStatus": "Pending",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Billing"],
+    "usage": {
+      "storageUsed": 1.5,
+      "messagesSent": 200,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_16",
+    "name": "Pinnacle Consulting",
+    "owner": "Srinivas Rao",
+    "mobile": "+91 99490 88776",
+    "email": "srinivas@pinnacle.consulting",
+    "subscription": "Professional",
+    "status": "Suspended",
+    "createdDate": "2025-03-20",
+    "logo": "PC",
+    "gst": "36PPPPP6666P6ZF",
+    "pan": "LMNOP2345Q",
+    "address": "Gachibowli, Hyderabad, Telangana 500032",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Reports", "Billing"],
+    "usage": {
+      "storageUsed": 19.3,
+      "messagesSent": 8400,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_17",
+    "name": "Green Leaf Florist",
+    "owner": "Pooja Hegde",
+    "mobile": "+91 98860 99001",
+    "email": "pooja@greenleafflorist.com",
+    "subscription": "Starter",
+    "status": "Active",
+    "createdDate": "2025-05-02",
+    "logo": "GL",
+    "gst": "29QQQQQ7777Q7ZG",
+    "pan": "RSTUV6789W",
+    "address": "Jayanagar, Bangalore, Karnataka 560041",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "Billing"],
+    "usage": {
+      "storageUsed": 3.2,
+      "messagesSent": 1900,
+      "whatsappAccountsConnected": 1
+    }
+  },
+  {
+    "id": "biz_18",
+    "name": "Titanium Steels",
+    "owner": "Narender Singh",
+    "mobile": "+91 98140 55443",
+    "email": "narender@titaniumsteels.com",
+    "subscription": "Custom",
+    "status": "Active",
+    "createdDate": "2025-02-12",
+    "logo": "TS",
+    "gst": "03RRRRR8888R8ZH",
+    "pan": "XYZAB0123C",
+    "address": "Industrial Area Phase 2, Chandigarh 160002",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Inventory", "Billing", "POS", "AI Assistant", "Reports"],
+    "usage": {
+      "storageUsed": 155.8,
+      "messagesSent": 89000,
+      "whatsappAccountsConnected": 8
+    }
+  },
+  {
+    "id": "biz_19",
+    "name": "Aura Wellness Retreat",
+    "owner": "Devika Sen",
+    "mobile": "+91 97110 22334",
+    "email": "devika@auraretreat.in",
+    "subscription": "Professional",
+    "status": "Active",
+    "createdDate": "2025-04-15",
+    "logo": "AW",
+    "gst": "07SSSSS9999S9ZI",
+    "pan": "DEFGH4567I",
+    "address": "Vasant Kunj, New Delhi 110070",
+    "kycStatus": "Approved",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Billing", "Reports"],
+    "usage": {
+      "storageUsed": 11.2,
+      "messagesSent": 6200,
+      "whatsappAccountsConnected": 2
+    }
+  },
+  {
+    "id": "biz_20",
+    "name": "Pixel Digital Agency",
+    "owner": "Sandeep Goel",
+    "mobile": "+91 99100 66778",
+    "email": "sandeep@pixelagency.com",
+    "subscription": "Starter",
+    "status": "Pending KYC",
+    "createdDate": "2025-06-30",
+    "logo": "PD",
+    "gst": "07TTTTT0000T0ZJ",
+    "pan": "JKLMN8901O",
+    "address": "DLF Phase 3, Gurugram, Haryana 122002",
+    "kycStatus": "Pending",
+    "modulesEnabled": ["Bulk WhatsApp", "CRM", "Billing"],
+    "usage": {
+      "storageUsed": 0.8,
+      "messagesSent": 100,
+      "whatsappAccountsConnected": 1
+    }
+  }
+]

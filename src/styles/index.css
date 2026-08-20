@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#FFFFFF] text-[#111111] antialiased selection:bg-[#111111] selection:text-white;
+  }
+}
+
+/* Custom Scrollbar for premium SaaS feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAFAFA;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E5E5;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C5C5C5;
+}
+
+/* Custom classes for our glassmorphism and animations */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Shimmer animation for Skeleton Loader */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* Force Flat Corporate Design Globally with small border-radius */
+*, *::before, *::after {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+/* Exemption for circular avatars & initials */
+.rounded-full, .circle-avatar, .circle-avatar *, .rounded-full::before, .rounded-full::after, .custom-toggle::before, .custom-toggle::after {
+  border-radius: 9999px !important;
+}
+
+/* Compact Table Layout */
+table th, table td {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+/* Compact Forms & Buttons */
+input:not([type="radio"]):not([type="checkbox"]), select, textarea {
+  height: 30px !important;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  font-size: 13px !important;
+}
+
+input.pl-9 {
+  padding-left: 36px !important;
+}
+
+button {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  font-size: 13px !important;
+}
+
+/* Reduce general spacing/gaps in list views and headers */
+.space-y-8 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-backward: 0;
+  margin-top: 1rem !important;
+  margin-bottom: 0 !important;
+}
+
+.space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.75rem !important;
+}
+
+.p-8 {
+  padding: 1rem !important;
+}
+
+.py-8 {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+
+.gap-8 {
+  gap: 1rem !important;
+}
+
+.p-6 {
+  padding: 0.75rem !important;
+}
+
+.py-6 {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+.px-8 {
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+.gap-6 {
+  gap: 0.75rem !important;
+}
+
+.gap-4 {
+  gap: 0.5rem !important;
+}
+
+.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.5rem !important;
+}
+
+
