@@ -67,12 +67,7 @@ export const AppProvider = ({ children }) => {
   const [contacts, setContacts] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [groups, setGroups] = useState([
-    { id: "grp_1", name: "VIP Customers", membersCount: 45 },
-    { id: "grp_2", name: "New Signups", membersCount: 82 },
-    { id: "grp_3", name: "All Retailers", membersCount: 120 },
-    { id: "grp_4", name: "B2B Clients", membersCount: 34 }
-  ]);
+  const [groups, setGroups] = useState([]);
   const [whatsappNumbers, setWhatsappNumbers] = useState([
     { id: "num_1", phone: "+91 99999 88888", name: "Primary Business Desk", status: "Connected" },
     { id: "num_2", phone: "+91 99999 77777", name: "Support Line", status: "Connected" },
@@ -202,6 +197,15 @@ export const AppProvider = ({ children }) => {
       });
     }
     setMessages(mList);
+
+    // Initialize groups with contact mapping
+    const initialGroups = [
+      { id: "grp_1", name: "VIP Customers", tagName: "VIP", contactIds: cList.filter(c => c.tags.includes("VIP")).map(c => c.id) },
+      { id: "grp_2", name: "New Signups", tagName: "New Lead", contactIds: cList.filter(c => c.tags.includes("New Lead")).map(c => c.id) },
+      { id: "grp_3", name: "All Retailers", tagName: "Retailer", contactIds: cList.filter(c => c.tags.includes("Retailer")).map(c => c.id) },
+      { id: "grp_4", name: "B2B Clients", tagName: "Wholesaler", contactIds: cList.filter(c => c.tags.includes("Wholesaler")).map(c => c.id) }
+    ].map(g => ({ ...g, membersCount: g.contactIds.length }));
+    setGroups(initialGroups);
   }, []);
 
   // Actions
@@ -278,14 +282,31 @@ export const AppProvider = ({ children }) => {
     addToast(`Successfully imported ${importedList.length} contacts!`);
   };
 
-  const addGroup = (groupName) => {
+  const addGroup = (groupName, tagName = '', contactIds = []) => {
     const newGroup = {
       id: `grp_${groups.length + 1}`,
       name: groupName,
-      membersCount: 0
+      tagName: tagName,
+      contactIds: contactIds,
+      membersCount: contactIds.length
     };
     setGroups([...groups, newGroup]);
     addToast(`Group "${groupName}" created successfully!`);
+  };
+
+  const updateGroup = (id, updatedFields) => {
+    setGroups(groups.map(g => {
+      if (g.id === id) {
+        const contactIds = updatedFields.contactIds !== undefined ? updatedFields.contactIds : g.contactIds;
+        return {
+          ...g,
+          ...updatedFields,
+          membersCount: contactIds.length
+        };
+      }
+      return g;
+    }));
+    addToast(`Group updated successfully!`);
   };
 
   const deleteGroup = (id) => {
@@ -359,6 +380,7 @@ export const AppProvider = ({ children }) => {
       importContacts,
       groups,
       addGroup,
+      updateGroup,
       deleteGroup,
       templates,
       addTemplate,
