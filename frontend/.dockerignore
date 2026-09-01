@@ -1,0 +1,21 @@
+# Dependencies (reinstalled inside the image)
+node_modules/
+
+# Build outputs
+dist/
+.vite/
+
+# Local env files (provided via compose / build args)
+.env
+.env.*
+!.env.example
+
+# VCS / editor
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

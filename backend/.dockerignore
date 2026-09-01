@@ -1,0 +1,36 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python caches / build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# Test / tooling caches
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# Local env files (provided via compose env, never baked into the image)
+.env
+.env.*
+!.env.example
+
+# VCS / editor
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

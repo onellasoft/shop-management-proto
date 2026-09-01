@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, Users, Settings, PlusCircle, CheckSquare, Shield, HelpCircle, PhoneCall, ChevronRight } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, ROLES, isSuperAdmin } from '../context/AppContext';
 
 export const CommandPalette = () => {
   const {
@@ -43,14 +43,18 @@ export const CommandPalette = () => {
   const getStaticOptions = () => {
     const common = [
       {
-        id: 'switch_role', title: `Switch to ${currentRole === 'super_admin' ? 'Business Admin' : 'Super Admin'}`, category: 'Actions', icon: Globe, action: () => {
-          setCurrentRole(currentRole === 'super_admin' ? 'business_admin' : 'super_admin');
+        id: 'switch_role',
+        title: `Switch to ${isSuperAdmin(currentRole) ? 'Business Admin' : 'Agency Admin'}`,
+        category: 'Actions',
+        icon: Globe,
+        action: () => {
+          setCurrentRole(isSuperAdmin(currentRole) ? ROLES.AGENCYADMIN : ROLES.SUPERADMIN);
           setActivePath('dashboard');
-        }
+        },
       },
     ];
 
-    if (currentRole === 'super_admin') {
+    if (isSuperAdmin(currentRole)) {
       return [
         ...common,
         { id: 'nav_dash', title: 'Go to Super Admin Dashboard', category: 'Navigation', icon: Globe, action: () => setActivePath('dashboard') },
@@ -83,7 +87,7 @@ export const CommandPalette = () => {
     let dynamicOpts = [];
 
     if (query.trim()) {
-      if (currentRole === 'super_admin') {
+      if (isSuperAdmin(currentRole)) {
         dynamicOpts = businesses
           .filter(b => b.name.toLowerCase().includes(query.toLowerCase()) || b.owner.toLowerCase().includes(query.toLowerCase()))
           .slice(0, 5)

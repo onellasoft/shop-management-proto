@@ -1,0 +1,101 @@
+# ============================================================================
+# Production override. Layer on top of the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#
+# Differences from dev:
+#   - Images built from the `prod` target (no reload, non-root, nginx frontend).
+#   - No source bind mounts (code is baked into the image).
+#   - A dedicated one-shot `migrate` service applies migrations once; app
+#     replicas set RUN_MIGRATIONS=0 so they don't race applying them on boot.
+#   - Frontend served by nginx on port 80, proxying /api to the backend.
+# ============================================================================
+
+services:
+  postgres:
+    ports: []  # do not expose the DB publicly in production
+    restart: unless-stopped
+
+  redis:
+    ports: []
+    restart: unless-stopped
+
+  # One-shot migration runner. Exits 0 after `alembic upgrade head`.
+  migrate:
+    build:
+      context: ./backend
+      target: prod
+    image: onella-backend:prod
+    command: ["alembic", "upgrade", "head"]
+    entrypoint: []  # bypass the app entrypoint; just run alembic and exit
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-onella}:${POSTGRES_PASSWORD:-onella}@postgres:5432/${POSTGRES_DB:-onella}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - onella
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      target: prod
+    image: onella-backend:prod
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-onella}:${POSTGRES_PASSWORD:-onella}@postgres:5432/${POSTGRES_DB:-onella}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      # App replicas don't migrate; the migrate service owns that.
+      RUN_MIGRATIONS: "0"
+    volumes: []  # no source bind mount in prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      target: prod
+    image: onella-backend:prod
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-onella}:${POSTGRES_PASSWORD:-onella}@postgres:5432/${POSTGRES_DB:-onella}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in production}
+      RUN_MIGRATIONS: "0"
+    entrypoint: []  # worker doesn't need the migration entrypoint
+    volumes: []
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+      args:
+        VITE_API_URL: /api
+    image: onella-frontend:prod
+    environment: {}
+    volumes: []
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped

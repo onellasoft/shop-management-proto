@@ -1,16 +1,24 @@
 # ============================================
-# Backend (Python/FastAPI)
+# Backend (Python / FastAPI)
 # ============================================
 
-# Python
+# Byte-compiled / optimized / cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual environments
 env/
 venv/
 ENV/
+.venv/
+backend/.venv/
+
+.kiro/
+
+# Packaging / build
 build/
 develop-eggs/
 dist/
@@ -30,7 +38,7 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Testing
+# Testing / coverage
 .tox/
 .coverage
 .coverage.*
@@ -45,55 +53,60 @@ coverage.xml
 *.db
 *.sqlite
 *.sqlite3
-migrations/versions/*.py  # Keep migrations dir, not individual versions initially
 
-# IDE
+# Alembic (keep the versions/ dir, ignore local scratch)
+# migrations/versions/*.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ============================================
+# Frontend (Node / React / Vite)
+# ============================================
+frontend/node_modules/
+node_modules/
+frontend/dist/
+frontend/.vite/
+.vite/
+.output/
+.turbo/
+
+# ============================================
+# Environment files
+# ============================================
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.local
+backend/.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# ============================================
+# Editors / IDE
+# ============================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-
-# Environment
-backend/.env
-backend/.env.local
-backend/.env.*.local
-
-# Celery
-celerybeat-schedule
 
 # ============================================
-# Frontend (Node/React)
-# ============================================
-frontend/node_modules/
-frontend/dist/
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
-
-# Build outputs
-build/
-dist/
-.output/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-
 # OS
+# ============================================
 .DS_Store
 Thumbs.db
 
 # ============================================
-# General
+# Logs
 # ============================================
-.env
-.env.*
-!.env.example
-.DS_Store
 *.log
-*.lock
-.turbo/
+
+# ============================================
+# Local, untracked notes / scratch
+# ============================================
+.local/
+*.local.md

@@ -1,0 +1,128 @@
+# ============================================================================
+# Development stack.
+#
+#   docker compose up --build
+#
+# Services:
+#   postgres  - PostgreSQL 16 (named volume for persistence, healthcheck)
+#   redis     - Redis 7 (OTP store, caches, Celery broker/backend)
+#   backend   - FastAPI (uvicorn --reload), applies migrations on boot
+#   worker    - Celery worker for async tasks (e.g. audit logging)
+#   frontend  - Vite dev server with HMR (source bind-mounted)
+#
+# Config is driven by a root .env file (see .env.example). Source directories
+# are bind-mounted so edits hot-reload without rebuilding images.
+# ============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-onella}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onella}
+      POSTGRES_DB: ${POSTGRES_DB:-onella}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onella} -d ${POSTGRES_DB:-onella}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - onella
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - onella
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    image: onella-backend:dev
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-onella}:${POSTGRES_PASSWORD:-onella}@postgres:5432/${POSTGRES_DB:-onella}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4300}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-1}
+    volumes:
+      # Bind-mount source for hot reload; keep the image's installed package
+      # metadata by not shadowing site-packages.
+      - ./backend:/app
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - onella
+
+  worker:
+    build:
+      context: ./backend
+      target: dev
+    image: onella-backend:dev
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info"]
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-onella}:${POSTGRES_PASSWORD:-onella}@postgres:5432/${POSTGRES_DB:-onella}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-development}
+      # The worker must not run migrations; the backend owns that.
+      RUN_MIGRATIONS: "0"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - onella
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    image: onella-frontend:dev
+    environment:
+      # Frontend calls fetch(`${VITE_API_URL}/...`); the dev server proxies
+      # /api to the backend service (see vite.config.js).
+      VITE_API_URL: /api
+      VITE_API_PROXY_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume keeps the image's node_modules from being shadowed by
+      # the bind mount above.
+      - /app/node_modules
+    ports:
+      - "${FRONTEND_PORT:-4300}:4300"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - onella
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  onella:
+    driver: bridge

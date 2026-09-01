@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, ROLES, isSuperAdmin } from '../context/AppContext';
 import {
   Menu, X, Bell, Search, ChevronDown, LogOut, ShieldAlert, User,
   LayoutDashboard, Building2, UserCheck, Settings, FileText,
@@ -13,11 +13,13 @@ export const AppLayout = ({ children }) => {
   const {
     currentRole,
     setCurrentRole,
+    setActivePath,
     setIsCommandPaletteOpen,
     notifications,
     setNotifications,
     addToast,
-    logout
+    logout,
+    userInfo,
   } = useApp();
 
   const location = useLocation();
@@ -49,7 +51,7 @@ export const AppLayout = ({ children }) => {
 
   // Generate dynamic sidebar items based on role
   const getSidebarItems = () => {
-    if (currentRole === 'super_admin') {
+    if (isSuperAdmin(currentRole)) {
       return [
         { path: 'dashboard', url: '/super-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: 'businesses', url: '/business-listing', label: 'Businesses', icon: Building2 },
@@ -91,7 +93,7 @@ export const AppLayout = ({ children }) => {
       settings: 'System Settings'
     };
     return [
-      {label: currentRole === 'super_admin' ? 'Agency Login' : 'Business Login', path: 'dashboard'},
+      {label: isSuperAdmin(currentRole) ? 'Agency Admin' : 'Business Admin', path: 'dashboard'},
       { label: pathLabels[activePath] || 'Overview', path: activePath }
     ];
   };
@@ -265,17 +267,17 @@ export const AppLayout = ({ children }) => {
                 }}
                 className="flex items-center gap-2 hover:opacity-90 transition-opacity"
               >
-                <Avatar name={currentRole === 'super_admin' ? 'Agency Login' : 'Business Login'} size="sm" />
+                <Avatar name={userInfo?.email ?? (isSuperAdmin(currentRole) ? 'Agency Admin' : 'Business Admin')} size="sm" />
               </button>
 
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-[#E5E5E5] rounded-custom shadow-premium overflow-hidden z-40">
                   <div className="px-4 py-3 border-b border-[#E5E5E5]">
                     <p className="text-xs font-semibold text-[#111111]">
-                      {currentRole === 'super_admin' ? 'Sarah Jenkins (Agency)' : 'Organic Grocers'}
+                      {userInfo?.email ?? (isSuperAdmin(currentRole) ? 'Agency Admin' : 'Business Admin')}
                     </p>
                     <p className="text-[10px] text-[#6B7280] truncate mt-0.5">
-                      {currentRole === 'super_admin' ? 'agency.admin@onella.com' : 'admin@grocers.com'}
+                      {currentRole ?? 'Loading…'}
                     </p>
                   </div>
                   <div className="p-1">
@@ -292,14 +294,14 @@ export const AppLayout = ({ children }) => {
                     <button
                       onClick={() => {
                         setIsProfileOpen(false);
-                        setCurrentRole(currentRole === 'super_admin' ? 'business_admin' : 'super_admin');
+                        setCurrentRole(isSuperAdmin(currentRole) ? ROLES.AGENCYADMIN : ROLES.SUPERADMIN);
                         setActivePath('dashboard');
-                        addToast(`Switched Workspace Successfully!`);
+                        addToast('Switched Workspace Successfully!');
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#111111] hover:bg-[#F5F5F5] rounded-lg text-left"
                     >
                       <ShieldAlert className="h-3.5 w-3.5 text-[#6B7280]" />
-                      {currentRole === 'super_admin' ? 'Switch to Business Login' : 'Switch to Agency Login'}
+                      {isSuperAdmin(currentRole) ? 'Switch to Business View' : 'Switch to Agency View'}
                     </button>
                     <div className="border-t border-[#E5E5E5] my-1" />
                     <button
@@ -330,7 +332,7 @@ export const AppLayout = ({ children }) => {
                     }`}
                   onClick={() => {
                     if (b.path === 'dashboard') {
-                      navigate(currentRole === 'super_admin' ? '/super-admin/dashboard' : '/business/dashboard');
+                      navigate(isSuperAdmin(currentRole) ? '/super-admin/dashboard' : '/business/dashboard');
                     } else if (b.path === 'businesses') {
                       navigate('/business-listing');
                     } else {

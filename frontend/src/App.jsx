@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider, useApp, ROLES } from './context/AppContext';
 import { AppLayout } from './layouts/AppLayout';
 import { CommandPalette } from './components/CommandPalette';
 import { Toast } from './components/UI';
@@ -29,7 +29,10 @@ const BusinessDetailsWrapper = () => {
 };
 
 const AppContent = () => {
-  const { currentRole, toasts, isAuthenticated } = useApp();
+  const { currentRole, toasts, isAuthenticated, authLoading } = useApp();
+
+  // Show nothing while we try a silent token refresh on mount
+  if (authLoading) return null;
 
   if (!isAuthenticated) {
     return (
@@ -61,7 +64,7 @@ const AppContent = () => {
         <Route path="/business/settings" element={<BusinessAdminSettings />} />
 
         {/* Redirect / Fallback routes */}
-        <Route path="/" element={<Navigate to={currentRole === 'super_admin' ? "/super-admin/dashboard" : "/business/dashboard"} replace />} />
+        <Route path="/" element={<Navigate to={currentRole === ROLES.SUPERADMIN ? "/super-admin/dashboard" : "/business/dashboard"} replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       
