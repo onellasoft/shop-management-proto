@@ -1,9 +1,9 @@
 """Authorization_Service — permission evaluation and (later) tenant scoping.
 
-This module currently implements **per-request permission evaluation**
-(Task 9.1). Later tasks layer module gating (10.2), custom-role management
-(11.x), tenant-context derivation (13.1), the customer-list cache (15.x), and
-the ORM tenant filter (14.1) onto this same service.
+This module implements **per-request permission evaluation** (Task 9.1),
+module-subscription gating (10.2), custom-role management (11.x), and
+**tenant-context derivation** (Task 13.1). Later tasks layer the customer-list
+Redis cache (15.x) and the ORM tenant filter (14.1) onto this same service.
 
 Design reference: "Components and Interfaces → Authorization_Service"::
 
@@ -50,16 +50,25 @@ from sqlalchemy import exists, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache.customer_list_cache import (
+    AgencyCustomerListCache,
+    get_agency_customer_list_cache,
+)
 from app.core.errors import (
     ActionModuleUnsubscribedError,
     NotAuthorizedError,
     RoleNameConflictError,
+    TenantContextMissingError,
     ValidationError,
 )
+from app.core.security import AccessTokenClaims
 from app.core.tenant_context import TenantContext
+from app.models.customer import Customer
+from app.models.customer_user import CustomerUser
 from app.models.permission import Action, Resource, SubModule
 from app.models.role import Role, RolePermission, UserRole
 from app.models.subscription import CustomerSubscription
+from app.models.user import ROLE_TYPES
 
 # Custom-role name length bounds (Req 7.2).
 _ROLE_NAME_MIN_LEN = 1
@@ -83,11 +92,17 @@ class AuthorizationService:
         session: AsyncSession,
         *,
         now: Callable[[], datetime.datetime] | None = None,
+        customer_list_cache: AgencyCustomerListCache | None = None,
     ) -> None:
         self._session = session
         # Injectable clock for time-dependent checks (e.g. subscription
         # expiry). Defaults to real UTC time; tests supply a fake clock.
         self._now = now if now is not None else _utcnow
+        # Agency accessible-customer-list cache (Req 10). Defaults to the shared
+        # Redis-backed cache; tests inject an in-memory fake. Constructed lazily
+        # only when first needed so services that never derive an agencyadmin
+        # scope (e.g. permission-only checks) don't touch Redis.
+        self._customer_list_cache = customer_list_cache
 
     async def has_permission(self, ctx: TenantContext, action_key: str) -> bool:
         """Return whether ``ctx`` holds a permission for ``action_key``.
@@ -150,6 +165,248 @@ class AuthorizationService:
             raise NotAuthorizedError(
                 details={"action_key": action_key},
             ) from exc
+
+    # ------------------------------------------------------------------
+    # Tenant context derivation (Task 13.1 — Req 9.1, 4.2, 4.3, 4.5,
+    # 9.3, 9.4, 9.5, 9.6, 9.8)
+    # ------------------------------------------------------------------
+
+    async def build_tenant_context(
+        self,
+        claims: AccessTokenClaims,
+        impersonation: object | None = None,
+        *,
+        custom_role_customer_id: UUID | None = None,
+    ) -> TenantContext:
+        """Derive the immutable per-request tenant scope for ``claims`` (Req 9.1).
+
+        The accessible agency/customer scope is derived from the authenticated
+        user's ``role_type`` and their assignments, matching the design's scope
+        table:
+
+        * **superadmin** — no tenant boundary: ``is_superadmin=True``,
+          ``customer_scope`` empty (meaning "no filter"), ``agency_scope=None``
+          (Req 4.2, 9.3).
+        * **agencyadmin** — scoped to exactly one Agency: ``agency_scope`` is the
+          user's ``agency_id`` and ``customer_scope`` is every Customer under
+          that Agency, resolved via :meth:`resolve_agency_customer_ids`
+          (cache-backed, Req 4.3, 9.4, 10).
+        * **customeradmin** — scoped to the set of Customers assigned via the
+          ``customer_users`` mapping, which may span multiple Agencies;
+          ``agency_scope=None`` (Req 4.5, 9.5).
+        * **custom role** — when the principal acts under a custom role
+          (``custom_role_customer_id`` supplied), scope collapses to that single
+          Customer and ``custom_role_customer_id`` is recorded on the context
+          (Req 9.6).
+
+        Impersonation is deferred to Task 18: the ``impersonation`` parameter is
+        accepted so the middleware can pass an impersonation state later without
+        changing this signature, but it is not interpreted here — this task only
+        builds the non-impersonation context. When ``impersonation`` is provided
+        it is ignored (impersonation enforcement is wired in Task 18.1).
+
+        Parameters
+        ----------
+        claims:
+            The decoded, validated access-token claims identifying the acting
+            user, their ``role_type``, and (for agencyadmin) their ``agency_id``.
+        impersonation:
+            Reserved extension point for the active impersonation state
+            (Task 18). Ignored by this task; defaults to ``None``.
+        custom_role_customer_id:
+            When the principal is acting under a custom role, the single Customer
+            that role is scoped to. Collapses the derived scope to that Customer
+            (Req 9.6).
+
+        Returns
+        -------
+        TenantContext
+            The immutable scope snapshot for this request.
+
+        Raises
+        ------
+        TenantContextMissingError
+            When a non-superadmin scope cannot be derived — an agencyadmin
+            without an ``agency_id``, an unknown ``role_type``, or a
+            customeradmin/custom-role principal with no accessible Customer
+            (Req 9.8).
+        """
+        role_type = claims.role_type
+
+        # Req 4.2, 9.3 — a superadmin has no tenant boundary. The empty
+        # customer_scope is interpreted downstream as "no filter".
+        if role_type == "superadmin":
+            return TenantContext(
+                user_id=claims.sub,
+                role_type=role_type,
+                agency_scope=None,
+                customer_scope=frozenset(),
+                is_superadmin=True,
+                impersonating=False,
+                impersonated_agency_id=None,
+                impersonated_customer_id=None,
+                impersonator_user_id=None,
+                custom_role_customer_id=None,
+            )
+
+        # Req 9.6 — acting under a custom role collapses scope to its single
+        # Customer regardless of the underlying role_type's broader scope.
+        if custom_role_customer_id is not None:
+            return TenantContext(
+                user_id=claims.sub,
+                role_type=role_type,
+                agency_scope=None,
+                customer_scope=frozenset({custom_role_customer_id}),
+                is_superadmin=False,
+                impersonating=False,
+                impersonated_agency_id=None,
+                impersonated_customer_id=None,
+                impersonator_user_id=None,
+                custom_role_customer_id=custom_role_customer_id,
+            )
+
+        if role_type == "agencyadmin":
+            agency_id = claims.agency_id
+            if agency_id is None:
+                # Req 9.8 — an agencyadmin with no Agency has no derivable
+                # scope; reject rather than defaulting to an empty (or wide)
+                # boundary.
+                raise TenantContextMissingError(
+                    details={
+                        "reason": "agencyadmin_missing_agency",
+                        "user_id": str(claims.sub),
+                    },
+                )
+            customer_ids = await self.resolve_agency_customer_ids(agency_id)
+            # Req 9.8 — an Agency with zero Customers still yields a valid,
+            # if empty, boundary: the agencyadmin is legitimately scoped to its
+            # single Agency, so agency_scope alone is sufficient to derive a
+            # context. The empty customer_scope simply matches no customer rows.
+            return TenantContext(
+                user_id=claims.sub,
+                role_type=role_type,
+                agency_scope=agency_id,
+                customer_scope=frozenset(customer_ids),
+                is_superadmin=False,
+                impersonating=False,
+                impersonated_agency_id=None,
+                impersonated_customer_id=None,
+                impersonator_user_id=None,
+                custom_role_customer_id=None,
+            )
+
+        if role_type == "customeradmin":
+            customer_ids = await self._resolve_customeradmin_customer_ids(
+                claims.sub
+            )
+            if not customer_ids:
+                # Req 4.5 / 9.8 — a customeradmin requires at least one assigned
+                # Customer; with none, no scope can be derived and the request
+                # is rejected.
+                raise TenantContextMissingError(
+                    details={
+                        "reason": "customeradmin_no_customers",
+                        "user_id": str(claims.sub),
+                    },
+                )
+            return TenantContext(
+                user_id=claims.sub,
+                role_type=role_type,
+                agency_scope=None,
+                customer_scope=frozenset(customer_ids),
+                is_superadmin=False,
+                impersonating=False,
+                impersonated_agency_id=None,
+                impersonated_customer_id=None,
+                impersonator_user_id=None,
+                custom_role_customer_id=None,
+            )
+
+        # Req 9.8 — an unrecognized role_type cannot be scoped; fail-closed.
+        raise TenantContextMissingError(
+            details={
+                "reason": "unknown_role_type",
+                "role_type": str(role_type),
+                "allowed": list(ROLE_TYPES),
+            },
+        )
+
+    def _get_customer_list_cache(self) -> AgencyCustomerListCache:
+        """Return the agency customer-list cache, creating the default lazily.
+
+        The shared Redis-backed cache is only constructed on first use so a
+        service that never resolves an agencyadmin scope does not touch Redis.
+        Tests inject a fake via the constructor.
+        """
+        if self._customer_list_cache is None:
+            self._customer_list_cache = get_agency_customer_list_cache()
+        return self._customer_list_cache
+
+    async def resolve_agency_customer_ids(self, agency_id: UUID) -> list[UUID]:
+        """Return every Customer id under ``agency_id`` via cache + DB fallback.
+
+        Resolution goes through the 24-hour Redis cache (Req 10): on a cache hit
+        the cached list is returned without querying the database (Req 10.2); on
+        a miss/expired key the list is loaded from the database
+        (:meth:`_load_agency_customer_ids`) and stored back in the cache with the
+        24h TTL before being returned (Req 10.3 store-on-miss, Req 10.1).
+
+        Cache invalidation on customer lifecycle changes is Task 15.2; this
+        method only implements the read/store path.
+        """
+        cache = self._get_customer_list_cache()
+        return await cache.resolve(agency_id, lambda: self._load_agency_customer_ids(agency_id))
+
+    async def invalidate_agency_customer_cache(self, agency_id: UUID) -> None:
+        """Invalidate the cached accessible-customer list for ``agency_id`` (Req 10.4, 10.5).
+
+        Called whenever a Customer is added to, removed from, suspended within,
+        or activated within the Agency so the stale cached list is deleted; the
+        next :meth:`resolve_agency_customer_ids` then repopulates from the
+        database (Req 10.5). Delegates to the cache's ``invalidate`` primitive
+        (Task 15.1).
+
+        This is the design's named entry point (design "Components and
+        Interfaces → Authorization_Service"). The wiring that guarantees the
+        delete lands within 5 seconds of the change being committed lives in
+        :mod:`app.cache.customer_cache_invalidation`, whose post-commit event
+        listener detects the affected agencies and calls this method (or the
+        module-level lifecycle helpers) after the transaction is durable.
+        """
+        cache = self._get_customer_list_cache()
+        await cache.invalidate(agency_id)
+
+    async def _load_agency_customer_ids(self, agency_id: UUID) -> list[UUID]:
+        """Load the ids of every Customer under ``agency_id`` from the DB (Req 9.4).
+
+        The authoritative database read used as the cache loader/fallback in
+        :meth:`resolve_agency_customer_ids`. Isolated so the query is the single
+        source of truth on a cache miss.
+        """
+        rows = (
+            await self._session.execute(
+                select(Customer.id).where(Customer.agency_id == agency_id)
+            )
+        ).scalars().all()
+        return list(rows)
+
+    async def _resolve_customeradmin_customer_ids(
+        self, user_id: UUID
+    ) -> list[UUID]:
+        """Return the ids of Customers assigned to a customeradmin (Req 9.5).
+
+        Resolves the ``customer_users`` mapping for ``user_id``; the assigned
+        Customers may belong to different Agencies (Req 4.5). Read on this
+        request so newly added/removed assignments take effect immediately.
+        """
+        rows = (
+            await self._session.execute(
+                select(CustomerUser.customer_id).where(
+                    CustomerUser.user_id == user_id
+                )
+            )
+        ).scalars().all()
+        return list(rows)
 
     async def is_module_usable(
         self, customer_id: UUID, module_id: UUID

@@ -112,6 +112,12 @@ class Settings(BaseSettings):
         description="OTP time-to-live in seconds (10 minutes).",
     )
 
+    # --- Agency customer-list cache (Req 10.1, 10.3) ---
+    agency_customer_cache_ttl_seconds: int = Field(
+        default=86_400,
+        description="Agency accessible-customer-list cache TTL in seconds (24 hours).",
+    )
+
     @property
     def is_development(self) -> bool:
         """Whether the deployment environment is development (Req 2.10)."""

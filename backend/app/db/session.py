@@ -43,6 +43,20 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(
     autocommit=False,
 )
 
+# ---------------------------------------------------------------------------
+# Agency customer-list cache invalidation (Task 15.2 — Req 10.4, 10.5)
+# ---------------------------------------------------------------------------
+# Attach the SQLAlchemy post-commit listeners that invalidate an Agency's
+# cached accessible-customer list whenever a Customer is added / removed /
+# suspended / activated. Registered here (once, at session-layer import) so
+# every session created by ``AsyncSessionLocal`` — whose async engine drives an
+# underlying sync ``Session`` — participates. Registration is idempotent.
+from app.cache.customer_cache_invalidation import (  # noqa: E402
+    register_customer_cache_invalidation,
+)
+
+register_customer_cache_invalidation()
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency yielding a scoped async session per request.
@@ -59,4 +73,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
-__all__ = ["engine", "AsyncSessionLocal", "get_db"]
+__all__ = [
+    "engine",
+    "AsyncSessionLocal",
+    "get_db",
+    "register_customer_cache_invalidation",
+]

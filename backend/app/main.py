@@ -22,6 +22,7 @@ from app.api.routers import auth as auth_router
 from app.api.routers import modules as modules_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
+from app.middleware.auth_tenant import AuthTenantMiddleware
 
 
 def create_app() -> FastAPI:
@@ -40,6 +41,15 @@ def create_app() -> FastAPI:
         ),
         debug=settings.is_development,
     )
+
+    # Auth + tenant middleware (Task 13.2, Req 3.6/9.1/9.8): decodes the bearer
+    # access token and attaches the immutable TenantContext to request.state so
+    # the per-route require_permission dependency can read it. It is added
+    # before CORS below so that CORS remains the outermost middleware and adds
+    # its headers even to the auth error envelope this middleware may return.
+    # Starlette runs the most-recently-added middleware outermost, so this runs
+    # after CORS but still before route dependencies execute.
+    app.add_middleware(AuthTenantMiddleware)
 
     # CORS: allow the frontend origin(s) to call the API from the browser.
     # In production the frontend is served same-origin behind nginx and proxies
