@@ -8,6 +8,7 @@ Add new model modules here as they are created.
 from app.models.agency import Agency
 from app.models.customer import Customer
 from app.models.customer_user import CustomerUser
+from app.models.impersonation import ImpersonationSession
 from app.models.permission import Action, Module, Resource, SubModule
 from app.models.refresh_token import RefreshToken
 from app.models.role import Role, RolePermission, UserRole
@@ -20,6 +21,7 @@ __all__ = [
     "Customer",
     "CustomerSubscription",
     "CustomerUser",
+    "ImpersonationSession",
     "Module",
     "RefreshToken",
     "Resource",

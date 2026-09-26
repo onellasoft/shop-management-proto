@@ -58,6 +58,7 @@ from app.core.errors import (
 from app.core.tenant_context import TenantContext
 from app.db.session import get_db
 from app.models.permission import Action, Resource, SubModule
+from app.models.user import User
 from app.services.authorization_service import AuthorizationService
 
 
@@ -128,6 +129,43 @@ def _effective_customer_id(ctx: TenantContext):
     return None
 
 
+async def get_current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Return the authenticated :class:`User` for the current request.
+
+    Reads the :class:`TenantContext` attached by the auth/tenant middleware
+    (via :func:`_load_tenant_context`, which fails closed with
+    :class:`TenantContextMissingError` when no context is present, Req 9.8) and
+    loads the matching ``users`` row by ``tenant_context.user_id``.
+
+    Unlike :func:`require_permission`, this dependency performs *no* module/
+    permission gating — it only resolves the acting identity. It is used by the
+    impersonation router (Task 17.3), where the impersonator is always the
+    **authenticated** user (never an already-impersonated context): the
+    ``user_id`` on the context is the real signed-in user, so loading it here
+    gives the impersonator's own :class:`User` for
+    :meth:`ImpersonationService.start` (which reads ``.id``, ``.role_type`` and
+    ``.agency_id``).
+
+    Raises
+    ------
+    TenantContextMissingError
+        When the request carries no tenant context (unauthenticated), reusing
+        the fail-closed pattern from :func:`_load_tenant_context` (Req 9.8).
+    """
+    ctx = _load_tenant_context(request)
+    user = await db.get(User, ctx.user_id)
+    if user is None:
+        # A valid context whose user row is gone (e.g. deleted mid-session) is
+        # treated as an unresolvable identity and denied fail-closed.
+        raise TenantContextMissingError(
+            details={"reason": "user_not_found", "user_id": str(ctx.user_id)}
+        )
+    return user
+
+
 def require_permission(
     action_key: str,
 ) -> Callable[..., Awaitable[TenantContext]]:
@@ -196,4 +234,4 @@ def require_permission(
     return _dep
 
 
-__all__ = ["require_permission"]
+__all__ = ["require_permission", "get_current_user"]

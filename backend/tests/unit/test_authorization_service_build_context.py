@@ -335,13 +335,120 @@ async def test_unknown_role_type_is_rejected():
 
 
 # ===========================================================================
-# impersonation parameter is a no-op extension point (Task 18)
+# impersonation — impersonated entity's boundary is enforced (Task 18.1,
+# Req 12.1)
 # ===========================================================================
 
 
-async def test_impersonation_parameter_is_ignored_for_now():
-    # Passing an impersonation state must not change the derived context;
-    # impersonation enforcement is wired in Task 18.
+class _Impersonation:
+    """Minimal ``ImpersonationState`` stand-in (mirrors ImpersonationSession)."""
+
+    def __init__(
+        self,
+        *,
+        impersonated_agency_id: UUID | None = None,
+        impersonated_customer_id: UUID | None = None,
+        impersonator_user_id: UUID | None = None,
+    ) -> None:
+        self.impersonated_agency_id = impersonated_agency_id
+        self.impersonated_customer_id = impersonated_customer_id
+        self.impersonator_user_id = impersonator_user_id
+
+
+async def test_impersonating_customer_collapses_scope_to_that_customer():
+    # Req 12.1 — impersonating a Customer collapses scope to that single
+    # Customer; impersonating flag and impersonated_customer_id are set.
+    impersonator = uuid4()
+    target_customer = uuid4()
+    svc = _service(_FakeSession())
+
+    ctx = await svc.build_tenant_context(
+        _claims("agencyadmin", user_id=impersonator, agency_id=uuid4()),
+        impersonation=_Impersonation(
+            impersonated_customer_id=target_customer,
+            impersonator_user_id=impersonator,
+        ),
+    )
+
+    assert ctx.impersonating is True
+    assert ctx.customer_scope == frozenset({target_customer})
+    assert ctx.agency_scope is None
+    assert ctx.impersonated_customer_id == target_customer
+    assert ctx.impersonated_agency_id is None
+    assert ctx.is_superadmin is False
+    # The real acting user is recorded for audit; user_id stays the impersonator.
+    assert ctx.impersonator_user_id == impersonator
+    assert ctx.user_id == impersonator
+
+
+async def test_superadmin_impersonating_customer_drops_to_customer_boundary():
+    # Req 12.1 — even a superadmin drops to the impersonated boundary: the
+    # impersonated scope is enforced, not the impersonator's unbounded scope.
+    impersonator = uuid4()
+    target_customer = uuid4()
+    svc = _service(_FakeSession())
+
+    ctx = await svc.build_tenant_context(
+        _claims("superadmin", user_id=impersonator),
+        impersonation=_Impersonation(
+            impersonated_customer_id=target_customer,
+            impersonator_user_id=impersonator,
+        ),
+    )
+
+    assert ctx.is_superadmin is False
+    assert ctx.impersonating is True
+    assert ctx.customer_scope == frozenset({target_customer})
+    assert ctx.impersonated_customer_id == target_customer
+    assert ctx.impersonator_user_id == impersonator
+
+
+async def test_impersonating_agency_scopes_to_agency_and_its_customers():
+    # Req 12.1 — impersonating an Agency sets agency_scope and customer_scope to
+    # that Agency's Customers (resolved via resolve_agency_customer_ids).
+    impersonator = uuid4()
+    target_agency = uuid4()
+    other_agency = uuid4()
+    c1, c2 = uuid4(), uuid4()
+    session = _FakeSession(
+        customers=[
+            _customer(c1, target_agency),
+            _customer(c2, target_agency),
+            _customer(uuid4(), other_agency),  # excluded
+        ]
+    )
+    svc = _service(session)
+
+    ctx = await svc.build_tenant_context(
+        _claims("superadmin", user_id=impersonator),
+        impersonation=_Impersonation(
+            impersonated_agency_id=target_agency,
+            impersonator_user_id=impersonator,
+        ),
+    )
+
+    assert ctx.impersonating is True
+    assert ctx.agency_scope == target_agency
+    assert ctx.customer_scope == frozenset({c1, c2})
+    assert ctx.impersonated_agency_id == target_agency
+    assert ctx.impersonated_customer_id is None
+    assert ctx.is_superadmin is False
+    assert ctx.impersonator_user_id == impersonator
+
+
+async def test_impersonation_with_no_target_is_rejected():
+    # Req 9.8 — an impersonation state with neither target cannot be scoped.
+    svc = _service(_FakeSession())
+    with pytest.raises(TenantContextMissingError):
+        await svc.build_tenant_context(
+            _claims("superadmin"),
+            impersonation=_Impersonation(impersonator_user_id=uuid4()),
+        )
+
+
+async def test_no_impersonation_builds_own_context():
+    # Req 12.4 — with no active impersonation (impersonation=None), the
+    # impersonator's own role-based context is built unchanged.
     agency = uuid4()
     c1 = uuid4()
     session = _FakeSession(customers=[_customer(c1, agency)])
@@ -349,9 +456,11 @@ async def test_impersonation_parameter_is_ignored_for_now():
 
     ctx = await svc.build_tenant_context(
         _claims("agencyadmin", agency_id=agency),
-        impersonation=object(),
+        impersonation=None,
     )
 
     assert ctx.impersonating is False
     assert ctx.agency_scope == agency
     assert ctx.customer_scope == frozenset({c1})
+    assert ctx.impersonated_customer_id is None
+    assert ctx.impersonator_user_id is None

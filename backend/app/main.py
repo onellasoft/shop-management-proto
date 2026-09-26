@@ -19,6 +19,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import auth as auth_router
+from app.api.routers import impersonation as impersonation_router
 from app.api.routers import modules as modules_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
@@ -72,6 +73,9 @@ def create_app() -> FastAPI:
 
     # Module catalog + subscription management (Task 10.3, Req 8.3).
     app.include_router(modules_router.router)
+
+    # Impersonation session lifecycle (Task 17.3, Req 11.4/11.5).
+    app.include_router(impersonation_router.router)
 
     # Health check to confirm the app boots and is serving requests.
     @app.get("/health", tags=["system"])

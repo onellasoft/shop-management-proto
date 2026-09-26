@@ -118,6 +118,15 @@ class Settings(BaseSettings):
         description="Agency accessible-customer-list cache TTL in seconds (24 hours).",
     )
 
+    # --- Impersonation session lifecycle (Req 11.7) ---
+    impersonation_session_ttl_minutes: int = Field(
+        default=60,
+        description=(
+            "Impersonation session max age in minutes; a session active longer "
+            "than this is treated as expired (Req 11.7)."
+        ),
+    )
+
     @property
     def is_development(self) -> bool:
         """Whether the deployment environment is development (Req 2.10)."""

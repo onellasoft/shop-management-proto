@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Callable
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from sqlalchemy import exists, select
@@ -73,6 +74,26 @@ from app.models.user import ROLE_TYPES
 # Custom-role name length bounds (Req 7.2).
 _ROLE_NAME_MIN_LEN = 1
 _ROLE_NAME_MAX_LEN = 100
+
+
+@runtime_checkable
+class ImpersonationState(Protocol):
+    """Minimal shape of an active impersonation carried into context building.
+
+    :meth:`AuthorizationService.build_tenant_context` interprets impersonation
+    through these three attributes only — the impersonated target (exactly one
+    of ``impersonated_agency_id`` / ``impersonated_customer_id`` is set, mirroring
+    the model's XOR CHECK) and the real acting user
+    (``impersonator_user_id``). The live
+    :class:`~app.models.impersonation.ImpersonationSession` row returned by
+    :meth:`ImpersonationService.get_active` already satisfies this protocol, so
+    the middleware passes the session directly; tests may pass any small object
+    exposing the same fields.
+    """
+
+    impersonated_agency_id: UUID | None
+    impersonated_customer_id: UUID | None
+    impersonator_user_id: UUID | None
 
 
 def _utcnow() -> datetime.datetime:
@@ -174,7 +195,7 @@ class AuthorizationService:
     async def build_tenant_context(
         self,
         claims: AccessTokenClaims,
-        impersonation: object | None = None,
+        impersonation: ImpersonationState | None = None,
         *,
         custom_role_customer_id: UUID | None = None,
     ) -> TenantContext:
@@ -199,11 +220,31 @@ class AuthorizationService:
           Customer and ``custom_role_customer_id`` is recorded on the context
           (Req 9.6).
 
-        Impersonation is deferred to Task 18: the ``impersonation`` parameter is
-        accepted so the middleware can pass an impersonation state later without
-        changing this signature, but it is not interpreted here — this task only
-        builds the non-impersonation context. When ``impersonation`` is provided
-        it is ignored (impersonation enforcement is wired in Task 18.1).
+        Impersonation (Task 18.1 — Req 12.1, 12.4): when ``impersonation`` is
+        supplied (an :class:`ImpersonationState`, i.e. the active
+        :class:`ImpersonationSession` the middleware resolved via
+        :meth:`ImpersonationService.get_active`), the derived scope collapses to
+        the **impersonated entity's** boundary rather than the impersonator's,
+        and takes precedence over the role-based branches below:
+
+        * impersonating a **Customer** → ``customer_scope={impersonated_customer_id}``,
+          ``agency_scope=None``, ``is_superadmin=False`` (the impersonator drops
+          to the impersonated boundary even when they are a superadmin, Req 12.1);
+        * impersonating an **Agency** → ``agency_scope=impersonated_agency_id`` and
+          ``customer_scope`` = that Agency's Customers (via
+          :meth:`resolve_agency_customer_ids`), ``is_superadmin=False``.
+
+        In both cases ``impersonating=True``, the ``impersonated_*`` fields are
+        set, and ``impersonator_user_id`` records the real acting user so audit
+        (Phase 5) can attribute the action; ``user_id`` remains the impersonator
+        (``claims.sub``) — the acting principal — while the impersonated scope is
+        expressed through ``agency_scope``/``customer_scope`` + the
+        ``impersonated_*`` fields (consumed coherently by ``tenant_query`` and
+        :func:`app.api.deps._effective_customer_id`). Req 12.4 (end/expiry
+        restores the impersonator's own context) needs no code here: detection is
+        per request via ``get_active``, so once the session is ended or expired
+        (>60 min, Req 11.7) ``impersonation`` is ``None`` and the role-based
+        branches build the impersonator's own context.
 
         Parameters
         ----------
@@ -211,8 +252,12 @@ class AuthorizationService:
             The decoded, validated access-token claims identifying the acting
             user, their ``role_type``, and (for agencyadmin) their ``agency_id``.
         impersonation:
-            Reserved extension point for the active impersonation state
-            (Task 18). Ignored by this task; defaults to ``None``.
+            The active impersonation state (the :class:`ImpersonationSession`
+            row) when the request runs under an impersonation, else ``None``.
+            When present it overrides the role-based scope with the impersonated
+            entity's boundary (Req 12.1). The middleware never passes an
+            expired/ended session (``get_active`` returns ``None`` for those),
+            so its presence alone means the impersonation is live.
         custom_role_customer_id:
             When the principal is acting under a custom role, the single Customer
             that role is scoped to. Collapses the derived scope to that Customer
@@ -231,6 +276,12 @@ class AuthorizationService:
             customeradmin/custom-role principal with no accessible Customer
             (Req 9.8).
         """
+        # Req 12.1 — an active impersonation overrides the role-based scope with
+        # the impersonated entity's boundary, ahead of every role branch (even
+        # superadmin), so the impersonator cannot exceed the impersonated scope.
+        if impersonation is not None:
+            return await self._build_impersonated_context(claims, impersonation)
+
         role_type = claims.role_type
 
         # Req 4.2, 9.3 — a superadmin has no tenant boundary. The empty
@@ -328,6 +379,80 @@ class AuthorizationService:
                 "reason": "unknown_role_type",
                 "role_type": str(role_type),
                 "allowed": list(ROLE_TYPES),
+            },
+        )
+
+    async def _build_impersonated_context(
+        self,
+        claims: AccessTokenClaims,
+        impersonation: ImpersonationState,
+    ) -> TenantContext:
+        """Derive the impersonated entity's tenant scope (Req 12.1).
+
+        Collapses the boundary to the impersonated Customer or Agency regardless
+        of the impersonator's own role (a superadmin drops to the impersonated
+        scope too). The returned context marks ``impersonating=True`` and records
+        the ``impersonated_*`` target plus ``impersonator_user_id`` = the real
+        acting user (``claims.sub``) for audit; ``user_id`` stays the
+        impersonator (the acting principal), while the enforced scope is the
+        impersonated entity's via ``agency_scope``/``customer_scope``.
+
+        Exactly one of ``impersonated_agency_id`` / ``impersonated_customer_id``
+        is set on a valid session (the model's XOR CHECK); the Customer target is
+        checked first.
+
+        Raises
+        ------
+        TenantContextMissingError
+            When the impersonation state carries neither target — an
+            inconsistent session that cannot be scoped; fail-closed (Req 9.8).
+        """
+        impersonated_customer_id = impersonation.impersonated_customer_id
+        impersonated_agency_id = impersonation.impersonated_agency_id
+        impersonator_user_id = claims.sub
+
+        # Impersonating a Customer — scope collapses to that single Customer
+        # (Req 12.1). is_superadmin=False so the impersonated boundary, not the
+        # impersonator's unbounded scope, is enforced downstream.
+        if impersonated_customer_id is not None:
+            return TenantContext(
+                user_id=claims.sub,
+                role_type=claims.role_type,
+                agency_scope=None,
+                customer_scope=frozenset({impersonated_customer_id}),
+                is_superadmin=False,
+                impersonating=True,
+                impersonated_agency_id=None,
+                impersonated_customer_id=impersonated_customer_id,
+                impersonator_user_id=impersonator_user_id,
+                custom_role_customer_id=None,
+            )
+
+        # Impersonating an Agency — agency_scope is the target and customer_scope
+        # is that Agency's Customers (reusing the cache-backed resolver, Req 10).
+        if impersonated_agency_id is not None:
+            customer_ids = await self.resolve_agency_customer_ids(
+                impersonated_agency_id
+            )
+            return TenantContext(
+                user_id=claims.sub,
+                role_type=claims.role_type,
+                agency_scope=impersonated_agency_id,
+                customer_scope=frozenset(customer_ids),
+                is_superadmin=False,
+                impersonating=True,
+                impersonated_agency_id=impersonated_agency_id,
+                impersonated_customer_id=None,
+                impersonator_user_id=impersonator_user_id,
+                custom_role_customer_id=None,
+            )
+
+        # Req 9.8 — a session with no target cannot be scoped; fail-closed
+        # rather than granting an unbounded (or empty) impersonated context.
+        raise TenantContextMissingError(
+            details={
+                "reason": "impersonation_missing_target",
+                "impersonator_user_id": str(impersonator_user_id),
             },
         )
 
@@ -994,4 +1119,4 @@ class AuthorizationService:
         )
 
 
-__all__ = ["AuthorizationService"]
+__all__ = ["AuthorizationService", "ImpersonationState"]

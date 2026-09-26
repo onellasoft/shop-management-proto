@@ -15,7 +15,8 @@ runs without a live Postgres — mirroring how
 
 from __future__ import annotations
 
-from uuid import uuid4
+import json
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi import Depends, Request
@@ -26,6 +27,7 @@ from app.api.deps import require_permission
 from app.core.security import create_access_token
 from app.core.tenant_context import TenantContext
 from app.main import create_app
+from app.services.impersonation_service import ImpersonationService
 
 
 # ---------------------------------------------------------------------------
@@ -34,12 +36,24 @@ from app.main import create_app
 # ---------------------------------------------------------------------------
 
 
+class _EmptyResult:
+    def scalar_one_or_none(self):
+        return None
+
+
 class _NoopSession:
     async def __aenter__(self):
         return self
 
     async def __aexit__(self, *exc):
         return False
+
+    async def execute(self, statement):  # noqa: ANN001
+        # The middleware runs ImpersonationService.get_active on this session
+        # before building the context. Returning an empty result models "no
+        # active impersonation" so tests that don't stub get_active still see
+        # the impersonator's own context.
+        return _EmptyResult()
 
 
 def _noop_session_factory():
@@ -59,6 +73,33 @@ def _context(role_type: str = "customeradmin") -> TenantContext:
         impersonator_user_id=None,
         custom_role_customer_id=None,
     )
+
+
+def _impersonated_context(
+    *, impersonator: UUID, impersonated_customer: UUID
+) -> TenantContext:
+    return TenantContext(
+        user_id=impersonator,
+        role_type="superadmin",
+        agency_scope=None,
+        customer_scope=frozenset({impersonated_customer}),
+        is_superadmin=False,
+        impersonating=True,
+        impersonated_agency_id=None,
+        impersonated_customer_id=impersonated_customer,
+        impersonator_user_id=impersonator,
+        custom_role_customer_id=None,
+    )
+
+
+class _FakeImpersonationSession:
+    """Stand-in for an active ImpersonationSession row (customer target)."""
+
+    def __init__(self, *, impersonated_customer_id: UUID) -> None:
+        self.impersonated_agency_id = None
+        self.impersonated_customer_id = impersonated_customer_id
+        self.impersonator_user_id = uuid4()
+        self.started_at = None
 
 
 def _build_app_with_probe():
@@ -92,6 +133,12 @@ def _build_app_with_probe():
             "role_type": ctx.role_type,
             "is_superadmin": ctx.is_superadmin,
             "customer_scope": [str(c) for c in ctx.customer_scope],
+            "impersonating": ctx.impersonating,
+            "impersonated_customer_id": (
+                str(ctx.impersonated_customer_id)
+                if ctx.impersonated_customer_id is not None
+                else None
+            ),
         }
 
     return app
@@ -227,3 +274,111 @@ def test_context_build_rejection_surfaces_envelope(monkeypatch):
     )
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "tenant_context_missing"
+
+
+# ---------------------------------------------------------------------------
+# Impersonation (Task 18.1 — Req 12.1, 12.3, 12.4)
+# ---------------------------------------------------------------------------
+
+
+def test_active_impersonation_attaches_impersonated_context_and_headers(
+    monkeypatch,
+):
+    # Req 12.1/12.3 — when get_active returns a session, the attached context is
+    # impersonating (built from the impersonated entity) and the response
+    # carries the impersonation indicator headers.
+    impersonator = uuid4()
+    impersonated_customer = uuid4()
+    ctx = _impersonated_context(
+        impersonator=impersonator, impersonated_customer=impersonated_customer
+    )
+    fake_session_row = _FakeImpersonationSession(
+        impersonated_customer_id=impersonated_customer
+    )
+
+    monkeypatch.setattr(mw, "AsyncSessionLocal", _noop_session_factory)
+
+    async def _fake_get_active(self, impersonator_id):
+        # Detection keys off the real (impersonator) user id from the token.
+        assert impersonator_id == impersonator
+        return fake_session_row
+
+    def _fake_build_indicator(self, session):
+        assert session is fake_session_row
+        return {
+            "impersonating": True,
+            "impersonated_type": "customer",
+            "impersonated_id": str(impersonated_customer),
+            "started_at": None,
+        }
+
+    async def _fake_build(self, claims, impersonation=None, **kwargs):
+        # The active session must be threaded into build_tenant_context.
+        assert impersonation is fake_session_row
+        return ctx
+
+    monkeypatch.setattr(ImpersonationService, "get_active", _fake_get_active)
+    monkeypatch.setattr(
+        ImpersonationService, "build_indicator", _fake_build_indicator
+    )
+    monkeypatch.setattr(
+        mw.AuthorizationService, "build_tenant_context", _fake_build
+    )
+
+    token = create_access_token(
+        user_id=impersonator, role_type="superadmin", email="s@example.com"
+    )
+    client = TestClient(_build_app_with_probe())
+    resp = client.get(
+        "/_probe/context", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["impersonating"] is True
+    assert data["impersonated_customer_id"] == str(impersonated_customer)
+    assert data["customer_scope"] == [str(impersonated_customer)]
+
+    # Req 12.3 — indicator headers present on the response.
+    assert resp.headers["X-Impersonating"] == "true"
+    assert resp.headers["X-Impersonated-Type"] == "customer"
+    assert resp.headers["X-Impersonated-Id"] == str(impersonated_customer)
+    payload = json.loads(resp.headers["X-Impersonation"])
+    assert payload["impersonating"] is True
+    assert payload["impersonated_id"] == str(impersonated_customer)
+
+
+def test_no_active_impersonation_uses_own_context_without_headers(monkeypatch):
+    # Req 12.4 — when get_active returns None (ended/expired/none), the context
+    # is the impersonator's own and no indicator header is present.
+    ctx = _context(role_type="customeradmin")
+
+    monkeypatch.setattr(mw, "AsyncSessionLocal", _noop_session_factory)
+
+    async def _fake_get_active(self, impersonator_id):
+        return None
+
+    async def _fake_build(self, claims, impersonation=None, **kwargs):
+        assert impersonation is None
+        return ctx
+
+    monkeypatch.setattr(ImpersonationService, "get_active", _fake_get_active)
+    monkeypatch.setattr(
+        mw.AuthorizationService, "build_tenant_context", _fake_build
+    )
+
+    token = create_access_token(
+        user_id=ctx.user_id, role_type="customeradmin", email="u@example.com"
+    )
+    client = TestClient(_build_app_with_probe())
+    resp = client.get(
+        "/_probe/context", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["impersonating"] is False
+    assert "X-Impersonating" not in resp.headers
+    assert "X-Impersonation" not in resp.headers
+    assert "X-Impersonated-Type" not in resp.headers
+    assert "X-Impersonated-Id" not in resp.headers
