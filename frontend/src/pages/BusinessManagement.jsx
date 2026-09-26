@@ -1,15 +1,33 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp, isAgencyAdmin, isSuperAdmin } from '../context/AppContext';
 import { DataTable } from '../components/DataTable';
 import { Badge, Button, Input } from '../components/UI';
 import { Modal, ConfirmDialog } from '../components/Modal';
+import { AgencyMultiSelect } from '../components/AgencyMultiSelect';
 import { FiPlus, FiEye, FiChevronLeft, FiClock, FiTrash2, FiCheck, FiChevronRight, FiBriefcase, FiCheckCircle, FiAlertTriangle, FiSend, FiEdit } from 'react-icons/fi';
 
 export const BusinessManagement = () => {
-  const { businesses, addBusiness, updateBusiness, suspendBusiness } = useApp();
+  const { businesses, agencies, addBusiness, updateBusiness, suspendBusiness, currentRole, userInfo } = useApp();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Superadmin agency filter: empty array = "All Agencies" (show everything).
+  const [selectedAgencyIds, setSelectedAgencyIds] = useState([]);
+
+  // An agencyadmin only sees the businesses belonging to their agency; a
+  // superadmin sees every business, optionally narrowed to the agencies they
+  // pick in the multi-select.
+  const scopedBusinesses = React.useMemo(() => {
+    if (isAgencyAdmin(currentRole)) {
+      const agencyId = userInfo?.agency_id ?? null;
+      return businesses.filter(b => b.agencyId === agencyId);
+    }
+    if (isSuperAdmin(currentRole) && selectedAgencyIds.length > 0) {
+      return businesses.filter(b => selectedAgencyIds.includes(b.agencyId));
+    }
+    return businesses;
+  }, [businesses, currentRole, userInfo, selectedAgencyIds]);
 
   const [editingBizId, setEditingBizId] = useState(null);
   const view = location.pathname === '/business-register' ? 'new' : (editingBizId ? 'edit' : 'list');
@@ -413,13 +431,13 @@ export const BusinessManagement = () => {
     resetForm();
   };
 
-  // Filter businesses
+  // Filter businesses (already scoped to the agency for agencyadmin)
   const filteredData = React.useMemo(() => {
-    return businesses.filter(b => {
+    return scopedBusinesses.filter(b => {
       const matchStatus = statusFilter === 'All' || b.status === statusFilter;
       return matchStatus;
     });
-  }, [businesses, statusFilter]);
+  }, [scopedBusinesses, statusFilter]);
 
   // Table Column Definitions
   const columns = [
@@ -1618,8 +1636,14 @@ export const BusinessManagement = () => {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[18px] font-bold text-[#111111] tracking-tight">Business Management</h1>
-          <p className="text-[12px] text-[#6B7280]">Add, suspend, audit, and configure tenant settings.</p>
+          <h1 className="text-[18px] font-bold text-[#111111] tracking-tight">
+            {isAgencyAdmin(currentRole) ? 'My Businesses' : 'Business Management'}
+          </h1>
+          <p className="text-[12px] text-[#6B7280]">
+            {isAgencyAdmin(currentRole)
+              ? 'Add, suspend, and manage the businesses under your agency.'
+              : 'Add, suspend, audit, and configure tenant settings across all agencies.'}
+          </p>
         </div>
         <div className="relative group">
           <Button variant="primary" icon={FiPlus} onClick={() => navigate('/business-register')} />
@@ -1669,6 +1693,15 @@ export const BusinessManagement = () => {
         onRowClick={(row) => navigate(`/business-details/${row.id}`)}
         filterComponent={
           <div className="flex gap-2 text-xs font-semibold">
+            {/* Agency multi-select (superadmin only) */}
+            {isSuperAdmin(currentRole) && (
+              <AgencyMultiSelect
+                agencies={agencies}
+                selectedIds={selectedAgencyIds}
+                onChange={setSelectedAgencyIds}
+              />
+            )}
+
             {/* Status Filter */}
             <select
               value={statusFilter}

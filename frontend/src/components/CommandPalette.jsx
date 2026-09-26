@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, Users, Settings, PlusCircle, CheckSquare, Shield, HelpCircle, PhoneCall, ChevronRight } from 'lucide-react';
-import { useApp, ROLES, isSuperAdmin } from '../context/AppContext';
+import { useApp, ROLES, isSuperAdmin, isAgencyAdmin, isCustomerAdmin } from '../context/AppContext';
 
 export const CommandPalette = () => {
   const {
@@ -9,10 +9,20 @@ export const CommandPalette = () => {
     setIsCommandPaletteOpen,
     currentRole,
     setCurrentRole,
+    cycleRole,
     setActivePath,
     businesses,
     contacts
   } = useApp();
+
+  const roleLabel = (role) => {
+    switch (role) {
+      case ROLES.SUPERADMIN:  return 'Super Admin';
+      case ROLES.AGENCYADMIN: return 'Agency Admin';
+      case ROLES.CUSTOMERADMIN: return 'Business Admin';
+      default: return 'User';
+    }
+  };
 
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -39,16 +49,18 @@ export const CommandPalette = () => {
     }
   }, [isCommandPaletteOpen]);
 
-  // Menu Options depending on role
+  // Menu Options depending on role. Only actions that map to actual routed
+  // pages are advertised (no dead links).
   const getStaticOptions = () => {
+    const nextRole = cycleRole(currentRole);
     const common = [
       {
         id: 'switch_role',
-        title: `Switch to ${isSuperAdmin(currentRole) ? 'Business Admin' : 'Agency Admin'}`,
+        title: `Switch to ${roleLabel(nextRole)} view`,
         category: 'Actions',
         icon: Globe,
         action: () => {
-          setCurrentRole(isSuperAdmin(currentRole) ? ROLES.AGENCYADMIN : ROLES.SUPERADMIN);
+          setCurrentRole(nextRole);
           setActivePath('dashboard');
         },
       },
@@ -58,27 +70,33 @@ export const CommandPalette = () => {
       return [
         ...common,
         { id: 'nav_dash', title: 'Go to Super Admin Dashboard', category: 'Navigation', icon: Globe, action: () => setActivePath('dashboard') },
+        { id: 'nav_agencies', title: 'Go to Agency Management', category: 'Navigation', icon: Shield, action: () => setActivePath('agencies') },
         { id: 'nav_biz', title: 'Go to Business Management', category: 'Navigation', icon: Users, action: () => setActivePath('businesses') },
-        { id: 'nav_kyc', title: 'Go to KYC Verification', category: 'Navigation', icon: Shield, action: () => setActivePath('kyc') },
-        { id: 'nav_modules', title: 'Go to Module Management', category: 'Navigation', icon: Settings, action: () => setActivePath('modules') },
-        { id: 'nav_subs', title: 'Go to Subscription Plans', category: 'Navigation', icon: CheckSquare, action: () => setActivePath('subscriptions') },
-        { id: 'nav_users', title: 'Go to Platform Users', category: 'Navigation', icon: Users, action: () => setActivePath('users') },
-        { id: 'nav_logs', title: 'Go to Audit Logs', category: 'Navigation', icon: HelpCircle, action: () => setActivePath('audit_logs') },
         { id: 'nav_settings', title: 'Go to System Settings', category: 'Navigation', icon: Settings, action: () => setActivePath('settings') },
       ];
-    } else {
+    }
+
+    if (isAgencyAdmin(currentRole)) {
       return [
         ...common,
-        { id: 'nav_dash_biz', title: 'Go to Business Dashboard', category: 'Navigation', icon: Globe, action: () => setActivePath('dashboard') },
-        { id: 'nav_contacts', title: 'Go to Contacts', category: 'Navigation', icon: Users, action: () => setActivePath('contacts') },
-        { id: 'nav_import', title: 'Start Import Wizard', category: 'Navigation', icon: PlusCircle, action: () => setActivePath('import') },
-        { id: 'nav_groups', title: 'Go to Groups', category: 'Navigation', icon: Users, action: () => setActivePath('groups') },
-        { id: 'nav_templates', title: 'Go to Templates', category: 'Navigation', icon: CheckSquare, action: () => setActivePath('templates') },
-        { id: 'nav_campaigns', title: 'Go to Campaigns', category: 'Navigation', icon: PlusCircle, action: () => setActivePath('campaigns') },
-        { id: 'nav_numbers', title: 'Go to WhatsApp Numbers', category: 'Navigation', icon: PhoneCall, action: () => setActivePath('whatsapp_numbers') },
-        { id: 'nav_settings_biz', title: 'Go to Company Settings', category: 'Navigation', icon: Settings, action: () => setActivePath('settings') },
+        { id: 'nav_dash_agency', title: 'Go to Agency Dashboard', category: 'Navigation', icon: Globe, action: () => setActivePath('dashboard') },
+        { id: 'nav_biz_agency', title: 'Go to My Businesses', category: 'Navigation', icon: Users, action: () => setActivePath('businesses') },
+        { id: 'nav_settings_agency', title: 'Go to Agency Settings', category: 'Navigation', icon: Settings, action: () => setActivePath('settings') },
       ];
     }
+
+    // customeradmin
+    return [
+      ...common,
+      { id: 'nav_dash_biz', title: 'Go to Business Dashboard', category: 'Navigation', icon: Globe, action: () => setActivePath('dashboard') },
+      { id: 'nav_contacts', title: 'Go to Contacts', category: 'Navigation', icon: Users, action: () => setActivePath('contacts') },
+      { id: 'nav_import', title: 'Start Import Wizard', category: 'Navigation', icon: PlusCircle, action: () => setActivePath('import') },
+      { id: 'nav_groups', title: 'Go to Groups', category: 'Navigation', icon: Users, action: () => setActivePath('groups') },
+      { id: 'nav_templates', title: 'Go to Templates', category: 'Navigation', icon: CheckSquare, action: () => setActivePath('templates') },
+      { id: 'nav_campaigns', title: 'Go to Campaigns', category: 'Navigation', icon: PlusCircle, action: () => setActivePath('campaigns') },
+      { id: 'nav_numbers', title: 'Go to WhatsApp Numbers', category: 'Navigation', icon: PhoneCall, action: () => setActivePath('whatsapp_numbers') },
+      { id: 'nav_settings_biz', title: 'Go to Company Settings', category: 'Navigation', icon: Settings, action: () => setActivePath('settings') },
+    ];
   };
 
   // Filter Items
@@ -87,7 +105,7 @@ export const CommandPalette = () => {
     let dynamicOpts = [];
 
     if (query.trim()) {
-      if (isSuperAdmin(currentRole)) {
+      if (isSuperAdmin(currentRole) || isAgencyAdmin(currentRole)) {
         dynamicOpts = businesses
           .filter(b => b.name.toLowerCase().includes(query.toLowerCase()) || b.owner.toLowerCase().includes(query.toLowerCase()))
           .slice(0, 5)

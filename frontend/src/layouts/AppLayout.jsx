@@ -1,18 +1,29 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useApp, ROLES, isSuperAdmin } from '../context/AppContext';
+import { useApp, ROLES, isSuperAdmin, isAgencyAdmin, isCustomerAdmin } from '../context/AppContext';
 import {
   Menu, X, Bell, Search, ChevronDown, LogOut, ShieldAlert, User,
   LayoutDashboard, Building2, UserCheck, Settings, FileText,
   Layers, CreditCard, Users, History, FileSpreadsheet, Group,
-  Send, PhoneOutgoing, Sliders
+  Send, PhoneOutgoing, Sliders, Briefcase
 } from 'lucide-react';
+
+// Human-readable label for each role, used in breadcrumbs and the profile menu.
+const roleLabel = (role) => {
+  switch (role) {
+    case ROLES.SUPERADMIN:  return 'Super Admin';
+    case ROLES.AGENCYADMIN: return 'Agency Admin';
+    case ROLES.CUSTOMERADMIN: return 'Business Admin';
+    default: return 'User';
+  }
+};
 import { Avatar, Badge, Button } from '../components/UI';
 
 export const AppLayout = ({ children }) => {
   const {
     currentRole,
     setCurrentRole,
+    cycleRole,
     setActivePath,
     setIsCommandPaletteOpen,
     notifications,
@@ -28,10 +39,13 @@ export const AppLayout = ({ children }) => {
 
   const getActivePathFromPathname = (path) => {
     if (path.startsWith('/super-admin/dashboard')) return 'dashboard';
+    if (path.startsWith('/agency/dashboard')) return 'dashboard';
     if (path.startsWith('/business/dashboard')) return 'dashboard';
+    if (path.startsWith('/agencies')) return 'agencies';
     if (path.startsWith('/business-listing') || path.startsWith('/business-register') || path.startsWith('/business-details')) return 'businesses';
     if (path.startsWith('/super-admin/settings')) return 'settings';
-    
+    if (path.startsWith('/agency/settings')) return 'settings';
+
     if (path.startsWith('/contacts')) return 'contacts';
     if (path.startsWith('/import')) return 'import';
     if (path.startsWith('/groups')) return 'groups';
@@ -49,26 +63,37 @@ export const AppLayout = ({ children }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
-  // Generate dynamic sidebar items based on role
+  // Generate dynamic sidebar items based on role. Each of the three roles gets
+  // a distinct navigation set matching its scope.
   const getSidebarItems = () => {
     if (isSuperAdmin(currentRole)) {
+      // Platform-wide: manage all agencies and all businesses.
       return [
-        { path: 'dashboard', url: '/super-admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { path: 'businesses', url: '/business-listing', label: 'Businesses', icon: Building2 },
-        { path: 'settings', url: '/super-admin/settings', label: 'Settings', icon: Settings },
-      ];
-    } else {
-      return [
-        { path: 'dashboard', url: '/business/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { path: 'contacts', url: '/contacts', label: 'Contacts', icon: Users },
-        { path: 'import', url: '/import', label: 'Import Wizard', icon: FileSpreadsheet },
-        { path: 'groups', url: '/groups', label: 'Groups', icon: Group },
-        { path: 'templates', url: '/templates', label: 'Templates', icon: FileText },
-        { path: 'campaigns', url: '/campaigns', label: 'Campaigns', icon: Send },
-        { path: 'whatsapp_numbers', url: '/whatsapp-numbers', label: 'WhatsApp Numbers', icon: PhoneOutgoing },
-        { path: 'settings', url: '/business/settings', label: 'Settings', icon: Sliders },
+        { path: 'dashboard',  url: '/super-admin/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
+        { path: 'agencies',   url: '/agencies',              label: 'Agencies',   icon: Briefcase },
+        { path: 'businesses', url: '/business-listing',      label: 'Businesses', icon: Building2 },
+        { path: 'settings',   url: '/super-admin/settings',  label: 'Settings',   icon: Settings },
       ];
     }
+    if (isAgencyAdmin(currentRole)) {
+      // Agency scope: manage the businesses (customers) belonging to the agency.
+      return [
+        { path: 'dashboard',  url: '/agency/dashboard',  label: 'Dashboard',  icon: LayoutDashboard },
+        { path: 'businesses', url: '/business-listing',  label: 'Businesses', icon: Building2 },
+        { path: 'settings',   url: '/agency/settings',   label: 'Settings',   icon: Settings },
+      ];
+    }
+    // customeradmin — single business workspace with the messaging toolset.
+    return [
+      { path: 'dashboard',        url: '/business/dashboard', label: 'Dashboard',        icon: LayoutDashboard },
+      { path: 'contacts',         url: '/contacts',           label: 'Contacts',         icon: Users },
+      { path: 'import',           url: '/import',             label: 'Import Wizard',    icon: FileSpreadsheet },
+      { path: 'groups',           url: '/groups',             label: 'Groups',           icon: Group },
+      { path: 'templates',        url: '/templates',          label: 'Templates',        icon: FileText },
+      { path: 'campaigns',        url: '/campaigns',          label: 'Campaigns',        icon: Send },
+      { path: 'whatsapp_numbers', url: '/whatsapp-numbers',   label: 'WhatsApp Numbers', icon: PhoneOutgoing },
+      { path: 'settings',         url: '/business/settings',  label: 'Settings',         icon: Sliders },
+    ];
   };
 
   const menuItems = getSidebarItems();
@@ -83,6 +108,7 @@ export const AppLayout = ({ children }) => {
   const getBreadcrumbs = () => {
     const pathLabels = {
       dashboard: 'Dashboard',
+      agencies: 'Agency Management',
       businesses: 'Business Management',
       contacts: 'Contact Database',
       import: 'Import Wizard',
@@ -93,7 +119,7 @@ export const AppLayout = ({ children }) => {
       settings: 'System Settings'
     };
     return [
-      {label: isSuperAdmin(currentRole) ? 'Agency Admin' : 'Business Admin', path: 'dashboard'},
+      { label: roleLabel(currentRole), path: 'dashboard' },
       { label: pathLabels[activePath] || 'Overview', path: activePath }
     ];
   };
@@ -267,17 +293,17 @@ export const AppLayout = ({ children }) => {
                 }}
                 className="flex items-center gap-2 hover:opacity-90 transition-opacity"
               >
-                <Avatar name={userInfo?.email ?? (isSuperAdmin(currentRole) ? 'Agency Admin' : 'Business Admin')} size="sm" />
+                <Avatar name={userInfo?.email ?? roleLabel(currentRole)} size="sm" />
               </button>
 
               {isProfileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-[#E5E5E5] rounded-custom shadow-premium overflow-hidden z-40">
                   <div className="px-4 py-3 border-b border-[#E5E5E5]">
                     <p className="text-xs font-semibold text-[#111111]">
-                      {userInfo?.email ?? (isSuperAdmin(currentRole) ? 'Agency Admin' : 'Business Admin')}
+                      {userInfo?.email ?? roleLabel(currentRole)}
                     </p>
                     <p className="text-[10px] text-[#6B7280] truncate mt-0.5">
-                      {currentRole ?? 'Loading…'}
+                      {roleLabel(currentRole)}
                     </p>
                   </div>
                   <div className="p-1">
@@ -294,14 +320,15 @@ export const AppLayout = ({ children }) => {
                     <button
                       onClick={() => {
                         setIsProfileOpen(false);
-                        setCurrentRole(isSuperAdmin(currentRole) ? ROLES.AGENCYADMIN : ROLES.SUPERADMIN);
+                        const next = cycleRole(currentRole);
+                        setCurrentRole(next);
                         setActivePath('dashboard');
-                        addToast('Switched Workspace Successfully!');
+                        addToast(`Switched to ${roleLabel(next)} view`);
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#111111] hover:bg-[#F5F5F5] rounded-lg text-left"
                     >
                       <ShieldAlert className="h-3.5 w-3.5 text-[#6B7280]" />
-                      {isSuperAdmin(currentRole) ? 'Switch to Business View' : 'Switch to Agency View'}
+                      Switch to {roleLabel(cycleRole(currentRole))} view
                     </button>
                     <div className="border-t border-[#E5E5E5] my-1" />
                     <button
@@ -331,13 +358,14 @@ export const AppLayout = ({ children }) => {
                   className={`hover:text-[#111111] cursor-pointer transition-colors ${index === arr.length - 1 ? 'text-[#111111] font-semibold' : ''
                     }`}
                   onClick={() => {
-                    if (b.path === 'dashboard') {
-                      navigate(isSuperAdmin(currentRole) ? '/super-admin/dashboard' : '/business/dashboard');
-                    } else if (b.path === 'businesses') {
+                    if (b.path === 'businesses') {
                       navigate('/business-listing');
                     } else {
+                      // dashboard/settings and everything else resolve through
+                      // the role-aware sidebar item list.
                       const matchedItem = menuItems.find(item => item.path === b.path);
                       if (matchedItem) navigate(matchedItem.url);
+                      else setActivePath(b.path);
                     }
                   }}
                 >

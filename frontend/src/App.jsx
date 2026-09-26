@@ -1,17 +1,22 @@
 import React from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
-import { AppProvider, useApp, ROLES } from './context/AppContext';
+import { AppProvider, useApp, ROLES, landingPathFor } from './context/AppContext';
 import { AppLayout } from './layouts/AppLayout';
 import { CommandPalette } from './components/CommandPalette';
 import { Toast } from './components/UI';
 
 // Super Admin Pages
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
+import { AgencyManagement } from './pages/AgencyManagement';
 import { BusinessManagement } from './pages/BusinessManagement';
 import { BusinessDetails } from './pages/BusinessDetails';
 import { SuperAdminSettings } from './pages/SuperAdminSettings';
 
-// Business Admin Pages
+// Agency Admin Pages
+import { AgencyAdminDashboard } from './pages/AgencyAdminDashboard';
+import { AgencyAdminSettings } from './pages/AgencyAdminSettings';
+
+// Customer Admin (business workspace) Pages
 import { BusinessAdminDashboard } from './pages/BusinessAdminDashboard';
 import { Contacts } from './pages/Contacts';
 import { ImportWizard } from './pages/ImportWizard';
@@ -26,6 +31,18 @@ const BusinessDetailsWrapper = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   return <BusinessDetails bizId={id} onClose={() => navigate('/business-listing')} />;
+};
+
+/**
+ * RoleRoute — guards a route so only the allowed roles can render it.
+ * If the current role isn't allowed, it redirects to that role's landing page.
+ * This prevents reaching another role's pages by typing the URL directly.
+ */
+const RoleRoute = ({ allow, currentRole, children }) => {
+  if (!allow.includes(currentRole)) {
+    return <Navigate to={landingPathFor(currentRole)} replace />;
+  }
+  return children;
 };
 
 const AppContent = () => {
@@ -43,31 +60,72 @@ const AppContent = () => {
     );
   }
 
+  const { SUPERADMIN, AGENCYADMIN, CUSTOMERADMIN } = ROLES;
+
   return (
     <AppLayout>
       <Routes>
-        {/* Super Admin Routes */}
-        <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
-        <Route path="/business-listing" element={<BusinessManagement />} />
-        <Route path="/business-register" element={<BusinessManagement />} />
-        <Route path="/business-details/:id" element={<BusinessDetailsWrapper />} />
-        <Route path="/super-admin/settings" element={<SuperAdminSettings />} />
+        {/* ---------- Super Admin ---------- */}
+        <Route path="/super-admin/dashboard" element={
+          <RoleRoute allow={[SUPERADMIN]} currentRole={currentRole}><SuperAdminDashboard /></RoleRoute>
+        } />
+        <Route path="/agencies" element={
+          <RoleRoute allow={[SUPERADMIN]} currentRole={currentRole}><AgencyManagement /></RoleRoute>
+        } />
+        <Route path="/super-admin/settings" element={
+          <RoleRoute allow={[SUPERADMIN]} currentRole={currentRole}><SuperAdminSettings /></RoleRoute>
+        } />
 
-        {/* Business Admin Routes */}
-        <Route path="/business/dashboard" element={<BusinessAdminDashboard />} />
-        <Route path="/contacts" element={<Contacts />} />
-        <Route path="/import" element={<ImportWizard />} />
-        <Route path="/groups" element={<Groups />} />
-        <Route path="/templates" element={<Templates />} />
-        <Route path="/campaigns" element={<Campaigns />} />
-        <Route path="/whatsapp-numbers" element={<WhatsAppNumbers />} />
-        <Route path="/business/settings" element={<BusinessAdminSettings />} />
+        {/* ---------- Agency Admin ---------- */}
+        <Route path="/agency/dashboard" element={
+          <RoleRoute allow={[AGENCYADMIN]} currentRole={currentRole}><AgencyAdminDashboard /></RoleRoute>
+        } />
+        <Route path="/agency/settings" element={
+          <RoleRoute allow={[AGENCYADMIN]} currentRole={currentRole}><AgencyAdminSettings /></RoleRoute>
+        } />
 
-        {/* Redirect / Fallback routes */}
-        <Route path="/" element={<Navigate to={currentRole === ROLES.SUPERADMIN ? "/super-admin/dashboard" : "/business/dashboard"} replace />} />
+        {/* ---------- Businesses / Customers (superadmin: all, agencyadmin: scoped) ---------- */}
+        <Route path="/business-listing" element={
+          <RoleRoute allow={[SUPERADMIN, AGENCYADMIN]} currentRole={currentRole}><BusinessManagement /></RoleRoute>
+        } />
+        <Route path="/business-register" element={
+          <RoleRoute allow={[SUPERADMIN, AGENCYADMIN]} currentRole={currentRole}><BusinessManagement /></RoleRoute>
+        } />
+        <Route path="/business-details/:id" element={
+          <RoleRoute allow={[SUPERADMIN, AGENCYADMIN]} currentRole={currentRole}><BusinessDetailsWrapper /></RoleRoute>
+        } />
+
+        {/* ---------- Customer Admin (single business workspace) ---------- */}
+        <Route path="/business/dashboard" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><BusinessAdminDashboard /></RoleRoute>
+        } />
+        <Route path="/contacts" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><Contacts /></RoleRoute>
+        } />
+        <Route path="/import" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><ImportWizard /></RoleRoute>
+        } />
+        <Route path="/groups" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><Groups /></RoleRoute>
+        } />
+        <Route path="/templates" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><Templates /></RoleRoute>
+        } />
+        <Route path="/campaigns" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><Campaigns /></RoleRoute>
+        } />
+        <Route path="/whatsapp-numbers" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><WhatsAppNumbers /></RoleRoute>
+        } />
+        <Route path="/business/settings" element={
+          <RoleRoute allow={[CUSTOMERADMIN]} currentRole={currentRole}><BusinessAdminSettings /></RoleRoute>
+        } />
+
+        {/* ---------- Redirect / Fallback ---------- */}
+        <Route path="/" element={<Navigate to={landingPathFor(currentRole)} replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      
+
       {/* Global Command Palette Overlay (Ctrl+K) */}
       <CommandPalette />
 

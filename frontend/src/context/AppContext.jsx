@@ -19,8 +19,20 @@ export const ROLES = {
 /** Returns true if the role has super-admin scope (platform-wide views). */
 export const isSuperAdmin = (role) => role === ROLES.SUPERADMIN;
 
-/** Returns true if the role has agency-level scope. */
+/** Returns true if the role has agency-level scope (manages its customers/businesses). */
 export const isAgencyAdmin = (role) => role === ROLES.AGENCYADMIN;
+
+/** Returns true if the role has customer-level scope (single business workspace). */
+export const isCustomerAdmin = (role) => role === ROLES.CUSTOMERADMIN;
+
+/** The landing route for a given role after login / on "/". */
+export const landingPathFor = (role) => {
+  switch (role) {
+    case ROLES.SUPERADMIN:  return '/super-admin/dashboard';
+    case ROLES.AGENCYADMIN: return '/agency/dashboard';
+    default:                return '/business/dashboard'; // customeradmin
+  }
+};
 
 // ---------------------------------------------------------------------------
 // JWT helpers (no library dependency — backend JWTs are standard)
@@ -96,10 +108,19 @@ export const AppProvider = ({ children }) => {
   const [roleOverride, setRoleOverride] = useState(null);
   const effectiveRole = roleOverride ?? currentRole;
 
-  // setCurrentRole — called by the workspace-switch button; cycles between
-  // superadmin and agencyadmin views in the UI.
+  // setCurrentRole — called by the workspace-switch button. Applies a UI-only
+  // override so the developer can preview any of the three role views. The JWT
+  // still governs what the backend will authorise.
   const setCurrentRole = useCallback((role) => {
     setRoleOverride(role);
+  }, []);
+
+  // cycleRole — returns the next role in the superadmin -> agencyadmin ->
+  // customeradmin -> superadmin loop, for the workspace-switch button.
+  const cycleRole = useCallback((role) => {
+    const order = [ROLES.SUPERADMIN, ROLES.AGENCYADMIN, ROLES.CUSTOMERADMIN];
+    const idx = order.indexOf(role);
+    return order[(idx + 1) % order.length];
   }, []);
 
   /** Apply a full TokenPair from the backend to state + localStorage. */
@@ -158,7 +179,7 @@ export const AppProvider = ({ children }) => {
   const handleLoginSuccess = useCallback((tokenPair) => {
     applyTokenPair(tokenPair);
     const role = decodeJwtPayload(tokenPair.access_token)?.role_type;
-    navigate(role === ROLES.SUPERADMIN ? '/super-admin/dashboard' : '/business/dashboard');
+    navigate(landingPathFor(role));
   }, [applyTokenPair, navigate]);
 
   const logout = useCallback(async () => {
@@ -181,9 +202,12 @@ export const AppProvider = ({ children }) => {
   // ------------------------------------------------------------------
   const getActivePathFromPathname = (path) => {
     if (path.startsWith('/super-admin/dashboard')) return 'dashboard';
+    if (path.startsWith('/agency/dashboard'))      return 'dashboard';
     if (path.startsWith('/business/dashboard'))    return 'dashboard';
+    if (path.startsWith('/agencies'))              return 'agencies';
     if (path.startsWith('/business-listing') || path.startsWith('/business-register') || path.startsWith('/business-details')) return 'businesses';
     if (path.startsWith('/super-admin/settings'))  return 'settings';
+    if (path.startsWith('/agency/settings'))       return 'settings';
     if (path.startsWith('/contacts'))              return 'contacts';
     if (path.startsWith('/import'))                return 'import';
     if (path.startsWith('/groups'))                return 'groups';
@@ -196,27 +220,40 @@ export const AppProvider = ({ children }) => {
 
   const activePath = getActivePathFromPathname(pathname);
 
-  const setActivePath = (path) => {
-    if (isSuperAdmin(effectiveRole)) {
-      const paths = {
-        dashboard: '/super-admin/dashboard',
+  // Per-role map of active-path key -> URL. Used by setActivePath and shared
+  // with the sidebar so navigation stays consistent per role.
+  const pathMapFor = (role) => {
+    if (isSuperAdmin(role)) {
+      return {
+        dashboard:  '/super-admin/dashboard',
+        agencies:   '/agencies',
         businesses: '/business-listing',
-        settings: '/super-admin/settings',
+        settings:   '/super-admin/settings',
       };
-      if (paths[path]) navigate(paths[path]);
-    } else {
-      const paths = {
-        dashboard: '/business/dashboard',
-        contacts: '/contacts',
-        import: '/import',
-        groups: '/groups',
-        templates: '/templates',
-        campaigns: '/campaigns',
-        whatsapp_numbers: '/whatsapp-numbers',
-        settings: '/business/settings',
-      };
-      if (paths[path]) navigate(paths[path]);
     }
+    if (isAgencyAdmin(role)) {
+      return {
+        dashboard:  '/agency/dashboard',
+        businesses: '/business-listing',
+        settings:   '/agency/settings',
+      };
+    }
+    // customeradmin
+    return {
+      dashboard:        '/business/dashboard',
+      contacts:         '/contacts',
+      import:           '/import',
+      groups:           '/groups',
+      templates:        '/templates',
+      campaigns:        '/campaigns',
+      whatsapp_numbers: '/whatsapp-numbers',
+      settings:         '/business/settings',
+    };
+  };
+
+  const setActivePath = (path) => {
+    const paths = pathMapFor(effectiveRole);
+    if (paths[path]) navigate(paths[path]);
   };
 
   // ------------------------------------------------------------------
@@ -236,6 +273,29 @@ export const AppProvider = ({ children }) => {
   // ------------------------------------------------------------------
   // Mock data (unchanged until Track 2)
   // ------------------------------------------------------------------
+  // Agencies — platform-wide list a superadmin manages. Each business/customer
+  // belongs to one agency via agencyId. The seeded agencyadmin owns 'agc_1'.
+  const [agencies, setAgencies] = useState([
+    { id: 'agc_1', name: 'Onella Inc',        owner: 'Agency Admin',   email: 'agencyadmin@onella.test', mobile: '+91 75886 11478', status: 'Active', createdDate: '2025-01-12', logo: 'OI' },
+    { id: 'agc_2', name: 'Bright Retail Group', owner: 'Nikhil Verma',  email: 'contact@brightretail.com', mobile: '+91 98220 45671', status: 'Active', createdDate: '2025-02-03', logo: 'BR' },
+    { id: 'agc_3', name: 'Metro Commerce Co', owner: 'Priya Nanda',    email: 'hello@metrocommerce.com', mobile: '+91 99101 33445', status: 'Suspended', createdDate: '2025-03-21', logo: 'MC' },
+  ]);
+
+  const addAgency = (agency) => {
+    const newAgency = { ...agency, id: `agc_${agencies.length + 1}`, logo: (agency.name || 'AG').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase(), status: 'Active', createdDate: new Date().toISOString().split('T')[0] };
+    setAgencies([newAgency, ...agencies]);
+    addToast(`Agency "${agency.name}" created successfully!`);
+  };
+  const updateAgency = (id, fields) => { setAgencies(agencies.map(a => a.id === id ? { ...a, ...fields } : a)); addToast('Agency updated successfully!'); };
+  const suspendAgency = (id) => {
+    setAgencies(agencies.map(a => {
+      if (a.id !== id) return a;
+      const newStatus = a.status === 'Suspended' ? 'Active' : 'Suspended';
+      addToast(`Agency "${a.name}" ${newStatus === 'Suspended' ? 'suspended' : 'activated'} successfully!`);
+      return { ...a, status: newStatus };
+    }));
+  };
+
   const [businesses, setBusinesses] = useState([]);
   const [templates,  setTemplates]  = useState([]);
   const [contacts,   setContacts]   = useState([]);
@@ -260,7 +320,8 @@ export const AppProvider = ({ children }) => {
 
   // Inflate mock data on mount (unchanged from original)
   useEffect(() => {
-    let bList = [...bizData];
+    // Backfill agencyId on the seeded rows so agency-scoped views have data.
+    let bList = bizData.map((b, idx) => ({ ...b, agencyId: b.agencyId ?? `agc_${(idx % 3) + 1}` }));
     const owners     = ['Arvind','Meenakshi','Sanjay','Suresh','Vikram','Shalini','Sunita','Deepak','Mohan','Amit'];
     const shopNames  = ['Mega Mart','Classic Shoes','National Stationers','Pioneer Chemist','Super Bakers','Kolkata Sweets','Metro Hardware','City Plaza','Smart Wear','Digital Hub'];
     const statuses   = ['Active','Suspended'];
@@ -270,6 +331,7 @@ export const AppProvider = ({ children }) => {
       const name      = shopNames[i % shopNames.length] + ' ' + i;
       bList.push({
         id: `biz_${i}`, name, owner: ownerName,
+        agencyId: `agc_${(i % 3) + 1}`,
         mobile: `+91 98${i%10}${i%10}0 123${i%10}`,
         email: `contact@${name.toLowerCase().replace(/\s+/g,'')}.com`,
         status: statuses[i%statuses.length],
@@ -323,7 +385,10 @@ export const AppProvider = ({ children }) => {
   // Mock CRUD actions (unchanged until Track 2)
   // ------------------------------------------------------------------
   const addBusiness = (biz) => {
-    const newBiz = { ...biz, id:`biz_${businesses.length+1}`, logo:biz.name.split(' ').map(w=>w[0]).join('').substring(0,2), createdDate:new Date().toISOString().split('T')[0], usage:{ storageUsed:0, messagesSent:0, whatsappAccountsConnected:1 } };
+    // An agencyadmin creating a business scopes it to their own agency; a
+    // superadmin may pass an explicit agencyId. Fall back to the first agency.
+    const scopedAgencyId = biz.agencyId ?? userInfo?.agency_id ?? agencies[0]?.id ?? null;
+    const newBiz = { ...biz, id:`biz_${businesses.length+1}`, agencyId: scopedAgencyId, logo:biz.name.split(' ').map(w=>w[0]).join('').substring(0,2), createdDate:new Date().toISOString().split('T')[0], usage:{ storageUsed:0, messagesSent:0, whatsappAccountsConnected:1 } };
     setBusinesses([newBiz, ...businesses]);
     addToast(`Business "${biz.name}" created successfully!`);
   };
@@ -381,7 +446,10 @@ export const AppProvider = ({ children }) => {
       setIsCommandPaletteOpen,
       toasts,
       addToast,
+      // role helpers
+      cycleRole,
       // data
+      agencies,     addAgency,      updateAgency,   suspendAgency,
       businesses,   addBusiness,    updateBusiness, suspendBusiness,
       contacts,     addContact,     deleteContact,  importContacts,
       groups,       addGroup,       deleteGroup,

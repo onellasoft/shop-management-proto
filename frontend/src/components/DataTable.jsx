@@ -85,10 +85,10 @@ export const DataTable = ({
       {/* Search & Filter Header */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:max-w-xs">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
           <input
             type="text"
-            className="w-full text-sm pl-9 pr-4 py-2 border border-[#E5E5E5] rounded-custom focus:outline-none focus:ring-1 focus:ring-[#111111] focus:border-[#111111]"
+            className="w-full text-sm pl-10 pr-4 py-2 border border-[#E5E5E5] rounded-custom focus:outline-none focus:ring-1 focus:ring-[#111111] focus:border-[#111111]"
             placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => {
