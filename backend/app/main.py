@@ -18,6 +18,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routers import audit as audit_router
 from app.api.routers import auth as auth_router
 from app.api.routers import impersonation as impersonation_router
 from app.api.routers import modules as modules_router
@@ -76,6 +77,9 @@ def create_app() -> FastAPI:
 
     # Impersonation session lifecycle (Task 17.3, Req 11.4/11.5).
     app.include_router(impersonation_router.router)
+
+    # Audit query + export (Task 22.3, Req 15.1/15.6).
+    app.include_router(audit_router.router)
 
     # Health check to confirm the app boots and is serving requests.
     @app.get("/health", tags=["system"])

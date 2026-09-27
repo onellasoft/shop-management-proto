@@ -30,7 +30,7 @@ def create_celery() -> Celery:
         "onella",
         broker=settings.redis_url,
         backend=settings.redis_url,
-        include=["app.tasks.audit"],
+        include=["app.tasks.audit_tasks"],
     )
 
     app.conf.update(

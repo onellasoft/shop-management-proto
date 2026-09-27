@@ -129,6 +129,19 @@ def _effective_customer_id(ctx: TenantContext):
     return None
 
 
+def get_tenant_context(request: Request) -> TenantContext:
+    """Return the request's :class:`TenantContext`, failing closed if absent.
+
+    A thin public wrapper over :func:`_load_tenant_context` for routes that need
+    the acting principal's tenant scope but perform *no* module/permission
+    gating — e.g. the audit compliance reads (Task 22.3), where the requester's
+    tenant scope alone governs which logs are visible (Req 15.1-15.3). An
+    unauthenticated request carries no context and is rejected with
+    :class:`TenantContextMissingError` (Req 9.8).
+    """
+    return _load_tenant_context(request)
+
+
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -234,4 +247,4 @@ def require_permission(
     return _dep
 
 
-__all__ = ["require_permission", "get_current_user"]
+__all__ = ["require_permission", "get_current_user", "get_tenant_context"]

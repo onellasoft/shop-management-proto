@@ -6,6 +6,7 @@ Add new model modules here as they are created.
 """
 
 from app.models.agency import Agency
+from app.models.audit import AuditFailure, AuditLog
 from app.models.customer import Customer
 from app.models.customer_user import CustomerUser
 from app.models.impersonation import ImpersonationSession
@@ -18,6 +19,8 @@ from app.models.user import User
 __all__ = [
     "Action",
     "Agency",
+    "AuditFailure",
+    "AuditLog",
     "Customer",
     "CustomerSubscription",
     "CustomerUser",

@@ -57,6 +57,18 @@ from app.cache.customer_cache_invalidation import (  # noqa: E402
 
 register_customer_cache_invalidation()
 
+# ---------------------------------------------------------------------------
+# Mutation audit logging (Task 21 — Req 14)
+# ---------------------------------------------------------------------------
+# Attach the SQLAlchemy listeners that (a) capture create/update/delete of
+# audited models and enqueue an audit write after commit (Req 14.1-14.5) and
+# (b) reject UPDATE/DELETE of append-only audit logs at flush time (Req 14.6).
+# Registered here, once at session-layer import, alongside the customer-cache
+# listeners so both coexist on every session. Registration is idempotent.
+from app.audit.mutation_capture import register_audit_listeners  # noqa: E402
+
+register_audit_listeners()
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency yielding a scoped async session per request.
@@ -78,4 +90,5 @@ __all__ = [
     "AsyncSessionLocal",
     "get_db",
     "register_customer_cache_invalidation",
+    "register_audit_listeners",
 ]
