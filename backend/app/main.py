@@ -22,6 +22,7 @@ from app.api.routers import audit as audit_router
 from app.api.routers import auth as auth_router
 from app.api.routers import impersonation as impersonation_router
 from app.api.routers import modules as modules_router
+from app.api.routers import roles as roles_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.middleware.auth_tenant import AuthTenantMiddleware
@@ -77,6 +78,9 @@ def create_app() -> FastAPI:
 
     # Impersonation session lifecycle (Task 17.3, Req 11.4/11.5).
     app.include_router(impersonation_router.router)
+
+    # Role management + permission catalog (Task 11.3, Req 7.2/7.3/7.4/7.5/5.1).
+    app.include_router(roles_router.router)
 
     # Audit query + export (Task 22.3, Req 15.1/15.6).
     app.include_router(audit_router.router)
