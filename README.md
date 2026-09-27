@@ -1,464 +1,332 @@
-# Onella: Shop Management SaaS
+# Onella SaaS
 
-A multi-tenant shop management platform for agencies and businesses to manage WhatsApp contacts, campaigns, and subscriptions. Built with a production-grade async FastAPI backend and a modern React frontend.
+A multi-tenant B2B SaaS platform for WhatsApp marketing and customer engagement. Agencies onboard and manage businesses (customers); businesses manage contacts, segments, templates, and campaigns.
 
-**Key features:**
-- Multi-tenant architecture with role-based access control (RBAC)
-- JWT-based authentication with email/password and mobile OTP login
-- Admin dashboards for superadmins, agency admins, and customer admins
-- Module subscriptions and role-based feature access
-- Asynchronous audit logging (append-only)
-- Staff impersonation for support and testing
-- WhatsApp contact and campaign management
+---
 
-## Architecture Overview
+## Architecture
 
-The platform is split into two independently deployable services:
-
-| Component | Role | Tech |
-|-----------|------|------|
-| **Backend (Onella)** | REST API, auth, multi-tenancy, audit | FastAPI, PostgreSQL, Redis, Celery |
-| **Frontend (SPA)** | Web dashboard, real-time UI | React 19, Vite, Tailwind, React Router |
-| **Infrastructure** | Persistence, job queue, caching | PostgreSQL, Redis, Celery worker |
-
-**Data flow:**
 ```
-[Browser] → [Vite dev server] → [/api/* proxy] → [FastAPI backend]
-                                                      ↓
-                                              [PostgreSQL] + [Redis]
-                                              [Celery worker for async jobs]
+Platform (superadmin)
+  └── Agency (agencyadmin)
+        └── Customer / Business (customeradmin + custom roles)
 ```
+
+| Component | Purpose | Stack |
+|-----------|---------|-------|
+| **Backend** | REST API, auth, RBAC, multi-tenancy, impersonation, audit | FastAPI, PostgreSQL, Redis, Celery |
+| **Frontend** | Web dashboards (SPA) | React 19, Vite, Tailwind CSS, React Router |
+
+```
+[Browser] → [Vite :4300] → [/api/* proxy] → [FastAPI :8000]
+                                                    ↓
+                                           [PostgreSQL] + [Redis]
+                                           [Celery worker]
+```
+
+---
 
 ## Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
-- (Optional) Python 3.11+ and Node.js 18+ for local development
 
-### First run (with Docker)
+### Run the stack
 
 ```bash
-cp .env.example .env       # Configure environment (optional, defaults work)
-docker compose up --build   # Start entire stack
+cp .env.example .env
+docker compose up --build
 ```
 
-This boots:
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:4300 |
+| Backend API | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| Frontend | http://localhost:4300 | React SPA (Vite dev server with HMR) |
-| Backend | http://localhost:8000 | FastAPI REST API |
-| PostgreSQL | localhost:5432 | Primary database (persisted) |
-| Redis | localhost:6379 | OTP/token store, Celery broker |
-| Celery Worker | — | Async job processor |
-
-**Note:** The frontend proxies all `/api/*` requests to the backend, so browser API calls stay on the same origin (http://localhost:4300).
-
-### Seed development data
-
-After the stack starts, populate test data:
+### Seed test data
 
 ```bash
 docker compose exec backend python -m app.scripts.seed
 ```
 
-This creates demo agencies, customers, and seeded admin users with roles and module subscriptions (idempotent, safe to run repeatedly).
+#### Test credentials (password: `Password123!`)
 
-#### Seeded test credentials
+| Email | Mobile | Role |
+|-------|--------|------|
+| `superadmin@onella.test` | +919561311757 | superadmin |
+| `agencyadmin@onella.test` | +917588611478 | agencyadmin |
+| `admin.apex@onella.test` | +919876543210 | customeradmin (Apex Retail) |
+| `admin.grocers@onella.test` | +919123456789 | customeradmin (Local Grocers) |
 
-All users have password `Password123!`. Log in with either **email + password** or **mobile + OTP**:
+#### OTP login (development)
 
-| Email | Mobile | Role | Notes |
-|-------|--------|------|-------|
-| `superadmin@onella.test` | +919561311757 | superadmin | Platform admin |
-| `agencyadmin@onella.test` | +917588611478 | agencyadmin | Agency admin (Onella Inc) |
-| `admin.apex@onella.test` | +919876543210 | customeradmin | Business admin (Apex Retail) |
-| `admin.grocers@onella.test` | +919123456789 | customeradmin | Business admin (Local Grocers) |
-
-#### Testing OTP login
-
-1. On the login page, go to the "OTP" tab (default)
-2. Click "Fill" to select a mobile number
-3. Click "Send OTP"
-4. Read the 6-digit OTP from Redis:
+1. Enter a mobile number and click **Send OTP**
+2. Read the OTP from Redis:
    ```bash
    docker compose exec redis redis-cli GET "otp:code:+919561311757"
    ```
-5. Paste the OTP and click "Verify OTP"
+3. Enter the OTP and click **Verify OTP**
 
-**Note:** In development, OTP is mocked (stored in Redis, not sent via SMS). For production, integrate a real SMS provider (Twilio, AWS SNS, etc.).
+---
 
-### View the app
+## Backend
 
-1. Open http://localhost:4300 in your browser
-2. Log in with seeded credentials above
-3. Dashboards auto-route based on role:
-   - **superadmin:** Dashboard showing platform overview
-   - **agencyadmin/customeradmin:** Home showing agency/customer details
+### Stack
 
-## Development Guide
+FastAPI (async) · PostgreSQL via SQLAlchemy 2 + Alembic · Redis · Celery · PyJWT · Pydantic v2 · bcrypt
 
-### Database migrations
+### Project layout
 
-Migrations run automatically when the backend container starts (`alembic upgrade head`). This is **idempotent** — applied revisions are recorded, so re-running is safe.
-
-To manage manually:
-
-```bash
-# Manually apply migrations
-docker compose exec backend alembic upgrade head
-
-# Roll back one revision (use with caution)
-docker compose exec backend alembic downgrade -1
-
-# See migration status
-docker compose exec backend alembic current
+```
+backend/
+  app/
+    core/          config, security (JWT/bcrypt), errors, TenantContext
+    db/            async engine, session factory, mixins, tenant_query helper
+    models/        SQLAlchemy ORM models (all 5 phases)
+    schemas/       Pydantic request/response schemas
+    services/      auth, authorization, impersonation, audit
+    api/
+      deps.py      require_permission, get_tenant_context, get_current_user
+      routers/     auth, modules, impersonation, audit
+    middleware/    AuthTenantMiddleware (JWT decode + TenantContext build)
+    cache/         redis client, OTP store, agency customer-list cache
+    audit/         mutation_capture (SQLAlchemy events, old/new diff, enqueue)
+    tasks/         celery_app, audit_tasks (write_audit_log)
+  alembic/         migrations (6 revisions, head: 5audit01)
+  tests/
+    unit/          297 tests
+    property/      10 Hypothesis property-test files (31 properties, Phases 3–5)
 ```
 
-### Backend development
+### Database migrations (6 revisions)
 
-**Local setup** (without Docker):
+| Revision | Description |
+|----------|-------------|
+| `fc94b119d8b4` | Core tables: agencies, customers, users, customer_users |
+| `2fabperm01` | Permission graph (modules/submodules/resources/actions) + roles seed |
+| `3fabsubs01` | Customer subscriptions |
+| `3refresh01` | Refresh tokens (rotation + reuse detection) |
+| `4imprs01` | Impersonation sessions |
+| `5audit01` | Audit logs + audit failures + append-only DB trigger |
+
+### API endpoints
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/auth/login` | — | Email + password → JWT pair |
+| `POST` | `/auth/otp/request` | — | Request OTP (mobile) |
+| `POST` | `/auth/otp/verify` | — | Verify OTP → JWT pair |
+| `POST` | `/auth/refresh` | Bearer | Rotate refresh token |
+| `POST` | `/auth/logout` | Bearer | Revoke token + chain |
+| `GET` | `/modules/catalog` | Bearer | Module catalog with subscription state |
+| `POST` | `/modules/subscriptions` | Bearer | Subscribe a customer to a module |
+| `DELETE` | `/modules/subscriptions` | Bearer | Remove subscription |
+| `POST` | `/impersonation/start` | Bearer | Start impersonation session |
+| `POST` | `/impersonation/end` | Bearer | End active session |
+| `GET` | `/impersonation/current` | Bearer | Current session indicator |
+| `GET` | `/audit/logs` | Bearer | Query audit logs (tenant-isolated) |
+| `GET` | `/audit/logs/export` | Bearer | Export logs as CSV or JSON |
+
+### Running locally without Docker
+
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[test]"
+uvicorn app.main:app --reload    # starts on :8000
+pytest tests/unit                # fast unit tests (~15s, no infra needed)
 ```
-
-**Run locally:**
-```bash
-uvicorn app.main:app --reload
-```
-
-The backend exposes:
-- `GET /health` — Health probe
-- `POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh` — Auth endpoints
-- `POST /auth/otp/request`, `POST /auth/otp/verify` — OTP flow
-- `GET /modules` — Module catalog
-- `POST /subscriptions`, `DELETE /subscriptions/{id}` — Subscription management
-- And more — see FastAPI auto-docs at http://localhost:8000/docs
-
-**Test:**
-```bash
-pytest
-```
-
-### Frontend development
-
-**Local setup** (without Docker):
-```bash
-cd frontend
-npm install
-```
-
-**Run locally:**
-```bash
-npm run dev
-```
-
-The Vite server starts on http://localhost:4300 with hot module reloading.
-
-**Build for production:**
-```bash
-npm run build      # outputs to dist/
-npm run preview    # preview production build
-```
-
-### Hot reload with Docker
-
-Both backend and frontend directories are bind-mounted in Docker containers, so:
-- Backend changes auto-reload (Uvicorn watch mode)
-- Frontend changes auto-reload (Vite HMR)
-
-No rebuild needed unless you change dependencies.
-
-### Environment configuration
-
-Configuration is managed via `.env` files (git-ignored):
-
-```bash
-# Root .env for Docker Compose
-POSTGRES_PASSWORD=dev
-REDIS_PASSWORD=dev
-JWT_SECRET=dev-secret-key
-```
-
-```bash
-# frontend/.env (if running locally without Docker)
-VITE_API_URL=http://localhost:8000/api
-```
-
-```bash
-# backend/.env (if running locally without Docker)
-DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost:5432/onella
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=dev-secret-key
-```
-
-See `.env.example` files in each directory for all available options.
-
-## Backend (`backend/`)
-
-FastAPI async service providing auth, RBAC, multi-tenancy, impersonation, and async audit logging.
-
-**Stack:** FastAPI + Uvicorn, PostgreSQL via async SQLAlchemy + Alembic, Redis (OTP store, caches, Celery broker), Celery, PyJWT, Pydantic v2, passlib[bcrypt].
-
-```
-app/
-  core/        config, security, errors, tenant context
-  db/          async engine, session, base, mixins
-  models/      SQLAlchemy models
-  schemas/     Pydantic request/response models
-  services/    auth, authorization, impersonation, audit
-  api/         deps + routers
-  middleware/  auth + tenant middleware
-  cache/       redis client + caches
-  tasks/       celery app + audit tasks
-tests/         unit / integration / property
-```
-
-**Key endpoints:**
-
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| `POST` | `/auth/login` | None | Email + password login |
-| `POST` | `/auth/otp/request` | None | Request OTP for mobile |
-| `POST` | `/auth/otp/verify` | None | Verify OTP, get JWT |
-| `POST` | `/auth/refresh` | Bearer token | Refresh access token |
-| `POST` | `/auth/logout` | Bearer token | Revoke refresh token |
-| `GET` | `/modules` | Bearer token | List module catalog |
-| `POST` | `/subscriptions` | Bearer token | Add module to customer |
-| `DELETE` | `/subscriptions/{id}` | Bearer token | Remove module from customer |
-| `GET` | `/audit/logs` | Bearer token | View audit log (superadmin) |
-
-## Frontend (`frontend/`)
-
-React 19 SPA built with Vite and styled with Tailwind CSS. Uses React Router, Recharts for reporting, Framer Motion for animation, and lucide/react-icons.
-
-### Directory structure
-
-```
-src/
-  pages/           Login, Dashboard, Home, etc.
-  components/      Reusable UI components
-  layouts/         AppLayout (sidebar, header)
-  context/         AppContext (auth, app state)
-  lib/             API client, utilities
-  App.jsx          Router, role-based routes
-```
-
-### Key components
-
-- **Login.jsx:** Two-tab login (OTP + email/password) with dev quick-fill
-- **AppLayout.jsx:** Sidebar, header, breadcrumbs, user menu (uses real user info from JWT)
-- **CommandPalette.jsx:** Command search (Cmd/Ctrl+K), workspace switching
-- **AppContext.jsx:** Central auth and app state management
 
 ---
 
-## Track 2: Implementation Status
+## Frontend
 
-### ✅ Completed (All 7 tasks)
+### Stack
 
-**Track 2 goal:** Wire frontend authentication to real backend APIs, replace mock login with real JWT flows, seed with mobile numbers, create API client layer, rewrite auth state management, rewrite login page with two tabs, and replace hardcoded role strings with backend-driven values.
+React 19 · Vite · Tailwind CSS · React Router · Recharts · Framer Motion · lucide-react
 
-#### 1. Frontend blast radius mapped
-- Identified all files using role strings or auth state
-- Files to modify: AppContext.jsx, AppLayout.jsx, CommandPalette.jsx, Login.jsx, App.jsx
-
-#### 2. Seed updated with mobile numbers
-Backend seed now populates mobile numbers for all test users (idempotent, backfills on existing users):
-- `superadmin@onella.test` → +919561311757
-- `agencyadmin@onella.test` → +917588611478
-- `admin.apex@onella.test` → +919876543210
-- `admin.grocers@onella.test` → +919123456789
-
-#### 3. API client layer created
-**File:** `frontend/src/lib/api.js`
-
-Thin wrapper around native fetch with:
-- `request()` helper with error handling
-- `authRequest()` for token-protected endpoints
-- `ApiError` class for structured errors
-- Implemented endpoints:
-  - `login(email, password)` → JWT pair
-  - `requestOtp(mobile)` → sends OTP
-  - `verifyOtp(mobile, otp)` → JWT pair
-  - `refreshTokens(refreshToken)` → new access token
-  - `logout(refreshToken)` → revokes token
-  - `getModuleCatalog()`, `addSubscription()`, `removeSubscription()`
-
-#### 4. AppContext rewritten with real auth state
-**File:** `frontend/src/context/AppContext.jsx`
-
-Now manages real JWT-based auth:
-- **State:** `accessToken`, `refreshToken` (localStorage), `userInfo` (decoded JWT claims), `isAuthenticated`, `authLoading`
-- **Silent refresh on mount:** Restores session from localStorage if refresh token is valid
-- **JWT decode:** Extracts `sub` (user ID), `email`, `role_type`, `agency_id`, `customer_id`
-- **Real login:** Calls `POST /auth/login` or `POST /auth/otp/verify`, stores tokens, navigates by role
-- **Real logout:** Calls `POST /auth/logout`, clears localStorage and state
-- **Workspace switch:** `setCurrentRole` applies UI-level override (`roleOverride`), doesn't re-login
-- **Authorization source of truth:** `effectiveRole` = `roleOverride ?? userInfo.role_type` (backend JWT always governs)
-
-#### 5. All role strings replaced
-- `super_admin` → `superadmin`
-- `business_admin` → `agencyadmin` (or `customeradmin` for customer-level users)
-- Files updated: AppContext.jsx, AppLayout.jsx, CommandPalette.jsx, App.jsx
-- All role checks now use `isSuperAdmin()` helper or imported `ROLES` constants
-- Backend `role_type` in JWT is single source of truth
-
-#### 6. Login page rewritten with two tabs
-**File:** `frontend/src/pages/Login.jsx`
-
-Two-tab interface:
-- **OTP Tab (default):**
-  - Mobile number input with "Fill" quick-select (dev feature)
-  - "Send OTP" button → `requestOtp(mobile)`
-  - 6-digit OTP input with auto-focus
-  - "Verify OTP" button → `verifyOtp(mobile, otp)`
-  - Dev hint: Shows Redis command to read OTP in development
-- **Email/Password Tab:**
-  - Email input with "Fill" quick-select (dev feature)
-  - Password input with show/hide toggle
-  - "Login" button → `login(email, password)`
-  - Dev quick-fill populates email and password
-- Error handling: Displays API error messages
-- Loading states: Buttons disabled during requests
-- On success: Tokens stored, context updated, navigation by role
-
-#### 7. End-to-end verification
-All flows tested against running stack:
-
-| Test | Result |
-|------|--------|
-| Email/password login | ✅ JWT with `role_type` |
-| Wrong password | ✅ 401 Unauthorized |
-| Token refresh | ✅ New access token issued |
-| Logout | ✅ Clears tokens and state |
-| OTP request | ✅ OTP stored in Redis |
-| OTP verification | ✅ JWT issued on match |
-| Silent refresh on mount | ✅ Restores session from localStorage |
-| Role-based routing | ✅ superadmin→/dashboard, others→/home |
-
-### 📋 Remaining (Track 2 scope TBD)
-
-Features implemented in backend, awaiting frontend UI or scope confirmation:
-
-1. **Real OTP SMS delivery**
-   - Backend has MockSmsSender (logs to console, stores in Redis)
-   - **Needed:** Integrate SMS provider (Twilio, AWS SNS, etc.) and add provider credentials
-   - **Impact:** Production OTP login requires real phone numbers and provider account
-
-2. **Staff impersonation UI**
-   - Backend endpoints ready: `POST /impersonation/login`, `POST /impersonation/exit`
-   - **Needed:** Wire Command Palette "Switch Role" action to impersonation endpoints
-   - **Use case:** Support staff testing, admin debugging
-   - **Status:** Awaiting scope confirmation — is this part of Track 2?
-
-3. **Audit log viewer UI**
-   - Backend appends audit logs asynchronously (Celery task)
-   - **Needed:** Create audit log viewer component, wire to `GET /audit/logs` endpoint
-   - **Use case:** Compliance, debugging, activity tracking
-   - **Status:** Awaiting scope confirmation — is this part of Track 2?
-
-4. **Multi-tenant workspace switching**
-   - Backend supports users with multiple businesses/agencies
-   - Frontend stub: `setCurrentRole` applies UI-level override only
-   - **Needed:** Fetch user's accessible businesses, add workspace selector UI, update tenant context
-   - **Status:** Awaiting scope confirmation — is this part of Track 2?
-
-5. **OTP login UX polish**
-   - Current: Works end-to-end, shows dev Redis hint
-   - **Polish items:**
-     - Hide Redis hint in production
-     - Add countdown timer for OTP expiry
-     - Add "Resend OTP" button with rate limiting
-     - Improve mobile number formatting (E.164)
-
-### How to verify Track 2 completion
-
-1. Start stack: `docker compose up --build`
-2. Seed: `docker compose exec backend python -m app.scripts.seed`
-3. Test email+password login:
-   - Go to http://localhost:4300
-   - Email tab → use superadmin@onella.test / Password123!
-   - Verify JWT in localStorage (DevTools → Application → Local Storage → `onella_access`)
-   - Verify role-based routing (superadmin → /dashboard)
-4. Test OTP login:
-   - OTP tab (default) → use +919561311757
-   - Click "Send OTP" → read from `docker compose exec redis redis-cli GET "otp:code:+919561311757"`
-   - Enter OTP → verify JWT issued
-5. Test logout:
-   - Click user avatar → "Logout"
-   - Verify localStorage cleared, redirected to /login
-6. Test workspace switch (UI-only):
-   - Command Palette (Cmd/Ctrl+K) → "Switch Role"
-   - Verify role UI updates (sidebar, navigation)
-   - Verify backend JWT still governs authorization (try accessing restricted feature)
-
-## Production Deployment
-
-### Docker production build
+### Running locally
 
 ```bash
-export JWT_SECRET=<generate-strong-secret-key>
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+cd frontend
+npm install --legacy-peer-deps
+npm run dev    # starts on :4300
 ```
 
-**What changes:**
-- Backend: Non-root user, optimized image
-- Frontend: Built to static dist/, served by Nginx
-- Migrations: One-shot `migrate` service (doesn't race on backend startup)
-- No hot reload, no Vite dev server
+---
 
-### Configuration for production
+## What each role sees on the UI
 
-Update `.env`:
+### Superadmin
+
+Platform-level administrator. Routes to `/super-admin/*`.
+
+| Screen | What they can do |
+|--------|-----------------|
+| **Dashboard** | Platform-wide stats: total agencies, active agencies, total messages sent, campaigns |
+| **Business Management** | View all businesses across all agencies; activate / suspend any |
+| **Platform Users** | View and manage all users across the platform |
+| **Module Management** | Manage the global module / submodule / resource / action catalog |
+| **Subscription Plans** | Define and manage subscription plans |
+| **Audit Logs** | Full audit history across all agencies and customers |
+| **Settings** | Platform-wide settings |
+| **KYC Verification** | Review and approve KYC submissions |
+| **Impersonation** | Can start a session impersonating any agency or any customer; UI shows an "IMPERSONATING" banner with EXIT button |
+
+### Agencyadmin
+
+Scoped to their single agency. Routes to `/agency/*`.
+
+| Screen | What they can do |
+|--------|-----------------|
+| **Dashboard** | Agency stats: active businesses, total broadcasts, total contacts, delivery rates |
+| **Business Management** | View and manage only businesses under their agency; add / suspend businesses |
+| **Audit Logs** | Audit history scoped to their agency only |
+| **Settings** | Agency-level settings |
+| **Impersonation** | Can start a session impersonating any customer they manage; UI shows banner + EXIT |
+
+### Customeradmin
+
+Scoped to their assigned businesses. Routes to `/business/*`.
+
+| Screen | What they can do |
+|--------|-----------------|
+| **Dashboard** | Business metrics: total contacts, segments, templates, campaigns run, delivery success %, live message log |
+| **Contacts** | View, import, and manage customer contacts |
+| **Groups / Segments** | Create and manage contact segments |
+| **Templates** | Browse and manage message templates (Marketing / Utility / Auth) |
+| **Campaigns** | Create, schedule, and broadcast campaigns to segments |
+| **Import Wizard** | Bulk import contacts via CSV |
+| **WhatsApp Numbers** | Connect and manage WhatsApp business numbers |
+| **Campaign Reports** | Per-campaign delivery stats |
+| **Audit Logs** | Audit history scoped to their business only |
+| **Settings** | Business-level settings |
+
+---
+
+## Flexible roles (custom roles for customeradmin)
+
+### What's implemented in the backend ✅
+
+The backend fully implements the custom roles system:
+
+- **Default roles seeded:** `finance_manager`, `staff`, `inventory_manager` available to every customer out of the box
+- **CRUD operations:** customeradmin can create, edit, clone, and delete custom roles within their business via `AuthorizationService`
+- **Subscription-gated assignment:** when assigning actions to a custom role, only actions from modules the customer is currently subscribed to can be assigned
+- **Module removal handling:** if a subscription expires or is removed, affected actions become non-usable but their definitions are retained — they reactivate if the module is re-added
+- **Permission enforcement:** every request checks DB permissions in real-time; revoking a role takes effect on the very next request
+- **Tenant isolation:** custom roles are scoped to a single customer with no cross-customer leakage
+
+### What's missing: the roles router ❌
+
+Task 11.3 (Add role management router) was tracked but not yet executed. The service logic and data model are complete; what's missing is wiring them to HTTP:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /roles` | List fixed + custom roles for a customer |
+| `POST /roles` | Create a custom role |
+| `POST /roles/{id}/clone` | Clone an existing role |
+| `PATCH /roles/{id}` | Rename a custom role |
+| `DELETE /roles/{id}` | Delete a custom role |
+| `PUT /roles/{id}/actions` | Assign action grants (subscription-gated) |
+| `GET /permissions/tree` | Full module → submodule → resource → action catalog |
+
+### What this means for the UI
+
+There are no roles management screens yet. Once the roles router is added, the UI would need:
+
+- A **Roles** screen in the business portal listing default and custom roles
+- A role editor with a module/action tree (showing only subscribed modules)
+- Clone and delete actions per role
+- A staff/user management screen to assign roles to team members
+
+---
+
+## Impersonation (backend fully implemented)
+
+- Superadmin can impersonate any agency or any customer
+- Agencyadmin can impersonate any customer they manage
+- Session is recorded with explicit start/end timestamps; 60-minute automatic expiry
+- The impersonated entity's tenant boundary is always enforced (even a superadmin is restricted to that entity's data)
+- Sensitive actions (configurable `is_sensitive` flag per action) are blocked during impersonation with an explicit error
+- Every response during an active session carries impersonation indicator headers (`X-Impersonating`, `X-Impersonated-Type`, `X-Impersonated-Id`, `X-Impersonation`) for the UI banner
+
+**Frontend todo:** Read `X-Impersonating` on responses → show banner + EXIT button wired to `POST /impersonation/end`.
+
+---
+
+## Audit Logging (backend fully implemented)
+
+- Every mutation (create / update / delete) is logged asynchronously via Celery — never blocks the request
+- Captures: user, role, module, sub-module, resource, action, old value, new value, timestamp, tenant identifiers, impersonation flag + impersonator id
+- Append-only at the DB level (PostgreSQL trigger) and application level
+- Retries up to 3× on write failure; writes a durable `audit_failures` record on exhaustion
+- Query API: tenant-isolated, AND-combined filters (date range, action, user, resource), timestamp-desc pagination (default 50, max 200)
+- Export: CSV or JSON, capped at 100,000 records
+
+**Frontend:** `AuditLogs.jsx` exists (currently mock data). Needs wiring to `GET /audit/logs` and `GET /audit/logs/export`.
+
+---
+
+## Development
+
+### Run tests
 
 ```bash
-# Database
-POSTGRES_PASSWORD=<strong-password>
-POSTGRES_DB=onella_prod
+cd backend
 
-# Redis
-REDIS_PASSWORD=<strong-password>
+# Fast unit tests (no infra required, ~15s)
+pytest tests/unit
 
-# Auth
-JWT_SECRET=<strong-secret-key>
-JWT_ALGORITHM=HS256
-JWT_EXPIRY_MINUTES=20
-JWT_REFRESH_EXPIRY_DAYS=14
-
-# OTP (integrate real provider)
-SMS_PROVIDER=twilio  # or: aws_sns, custom
-TWILIO_ACCOUNT_SID=<your-account-sid>
-TWILIO_AUTH_TOKEN=<your-auth-token>
-TWILIO_PHONE_NUMBER=<your-twilio-number>
-
-# Email
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=<your-email>
-SMTP_PASSWORD=<app-specific-password>
-
-# Frontend
-VITE_API_URL=https://api.yourdomain.com/api
+# Property-based tests by phase (Hypothesis, 100–200 iterations each)
+pytest tests/property/test_tenant_context_derivation_property.py   # Phase 3: tenancy
+pytest tests/property/test_no_cross_tenant_access_property.py       # Phase 3: isolation
+pytest tests/property/test_customer_list_cache_consistency_property.py  # Phase 3: cache
+pytest tests/property/test_impersonation_lifecycle_property.py      # Phase 4: lifecycle
+pytest tests/property/test_impersonation_enforcement_property.py    # Phase 4: security
+pytest tests/property/test_audit_logging_property.py               # Phase 5: write path
+pytest tests/property/test_audit_query_export_property.py          # Phase 5: read path
 ```
 
-### Monitoring & debugging
+### Migrations
 
 ```bash
-# View backend logs
-docker compose logs -f backend
-
-# View worker logs
-docker compose logs -f worker
-
-# Access backend docs
-curl http://localhost:8000/docs
-
-# Check database connection
-docker compose exec backend alembic current
-
-# See current users
-docker compose exec postgres psql -U postgres -d onella -c "SELECT email, role_type FROM users;"
+docker compose exec backend alembic upgrade head    # apply all
+docker compose exec backend alembic downgrade -1   # roll back one
+docker compose exec backend alembic current        # show state
 ```
+
+### Environment variables
+
+```bash
+# .env (root — Docker Compose)
+POSTGRES_PASSWORD=dev
+REDIS_PASSWORD=dev
+JWT_SECRET=dev-secret-key
+ENVIRONMENT=development
+
+# backend/.env (local dev without Docker)
+DATABASE_URL=postgresql+asyncpg://postgres:dev@localhost:5432/onella
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=dev-secret-key
+ENVIRONMENT=development
+ACCESS_TOKEN_TTL_MIN=20
+REFRESH_TOKEN_TTL_DAYS=14
+
+# frontend/.env (local dev without Docker)
+VITE_API_URL=http://localhost:8000
+```
+
+---
+
+## What's next
+
+1. **Roles router** — expose `GET/POST /roles`, `PUT /roles/{id}/actions`, `GET /permissions/tree` so the UI can manage staff roles
+2. **Impersonation UI** — read `X-Impersonating` header → show banner + wire EXIT button
+3. **Audit log UI** — wire `AuditLogs.jsx` to the real API
+4. **Staff / user management UI** — assign custom roles to team members within a business
+5. **Real SMS provider** — replace `MockSmsSender` with Twilio/AWS SNS for production OTP delivery
+6. **Frontend wiring** — modules, subscriptions, and impersonation endpoints all have backend APIs ready but no frontend integration yet
