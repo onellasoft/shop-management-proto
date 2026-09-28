@@ -100,6 +100,38 @@ def _role_with_actions(role: Role, action_ids: list[uuid.UUID]) -> RoleWithActio
 
 
 # ---------------------------------------------------------------------------
+# GET /roles/{role_id}
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/roles/{role_id}",
+    response_model=RoleWithActionsResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get a single custom role by id",
+)
+async def get_role(
+    role_id: uuid.UUID,
+    ctx: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_db),
+) -> RoleWithActionsResponse:
+    """Return a single custom role with its action ids (Req 7.3).
+
+    The role must be a custom role scoped to the caller's customer. Fixed roles
+    and roles outside the caller's customer scope are rejected fail-closed with
+    a ``NotAuthorizedError``.
+
+    Errors:
+    - ``NotAuthorizedError`` → 403 when the role is not found or not accessible.
+    """
+    service = AuthorizationService(session)
+    customer_id = service._require_single_customer_scope(ctx)
+    role = await service._get_custom_role(role_id, customer_id)
+    action_ids = await _load_action_ids(session, role.id)
+    return _role_with_actions(role, action_ids)
+
+
+# ---------------------------------------------------------------------------
 # GET /roles
 # ---------------------------------------------------------------------------
 

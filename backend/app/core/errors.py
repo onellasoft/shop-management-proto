@@ -58,6 +58,7 @@ class ErrorCode(str, Enum):
     AUDIT_IMMUTABLE = "audit_immutable"
     VALIDATION_ERROR = "validation_error"
     INTERNAL_ERROR = "internal_error"
+    USER_ALREADY_IN_CUSTOMER = "user_already_in_customer"
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +256,14 @@ class ValidationError(AppError):
     code = ErrorCode.VALIDATION_ERROR
     http_status = HTTP_422_UNPROCESSABLE
     message = "The request could not be validated."
+
+
+class UserAlreadyInCustomerError(AppError):
+    """User is already a staff member of this customer. Raised during invite."""
+
+    code = ErrorCode.USER_ALREADY_IN_CUSTOMER
+    http_status = status.HTTP_409_CONFLICT
+    message = "This user is already a staff member of the customer."
 
 
 # ---------------------------------------------------------------------------

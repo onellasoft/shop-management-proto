@@ -622,3 +622,81 @@ def test_unauthenticated_request_to_permissions_tree_is_rejected():
     resp = client.get("/permissions/tree")
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "tenant_context_missing"
+
+
+# ---------------------------------------------------------------------------
+# GET /roles/{role_id}
+# ---------------------------------------------------------------------------
+
+
+def test_get_role_returns_200_with_role_and_action_ids(make_client, monkeypatch):
+    """GET /roles/{role_id} returns 200 + RoleWithActionsResponse for a valid role."""
+    customer_id = uuid4()
+    role_id = uuid4()
+    action_id = uuid4()
+    role = _role(is_custom=True, customer_id=customer_id, name="My Role")
+    role.id = role_id
+
+    # Stub _require_single_customer_scope to return customer_id.
+    import app.services.authorization_service as svc_mod
+    monkeypatch.setattr(
+        svc_mod.AuthorizationService,
+        "_require_single_customer_scope",
+        lambda self_or_cls, ctx: customer_id,
+    )
+
+    # Stub _get_custom_role to return the role.
+    async def _fake_get_custom_role(self, rid, cid):
+        assert rid == role_id
+        assert cid == customer_id
+        return role
+
+    monkeypatch.setattr(
+        svc_mod.AuthorizationService,
+        "_get_custom_role",
+        _fake_get_custom_role,
+    )
+
+    # DB session returns one action_id for _load_action_ids.
+    db = _FakeDBSession(execute_response=lambda _stmt: _ScalarResult([action_id]))
+    client, ctx, token = make_client(db_session=db, customer_id=customer_id)
+
+    resp = client.get(f"/roles/{role_id}", headers=_auth(token))
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == str(role_id)
+    assert body["is_custom"] is True
+    assert body["name"] == "My Role"
+    assert body["customer_id"] == str(customer_id)
+    assert body["action_ids"] == [str(action_id)]
+
+
+def test_get_role_outside_scope_returns_403(make_client, monkeypatch):
+    """GET /roles/{role_id} → 403 when role is not accessible to the caller."""
+    customer_id = uuid4()
+    role_id = uuid4()
+
+    import app.services.authorization_service as svc_mod
+    monkeypatch.setattr(
+        svc_mod.AuthorizationService,
+        "_require_single_customer_scope",
+        lambda self_or_cls, ctx: customer_id,
+    )
+
+    async def _not_found(self, rid, cid):
+        raise NotAuthorizedError(details={"role_id": str(rid)})
+
+    monkeypatch.setattr(
+        svc_mod.AuthorizationService,
+        "_get_custom_role",
+        _not_found,
+    )
+
+    db = _FakeDBSession()
+    client, ctx, token = make_client(db_session=db, customer_id=customer_id)
+
+    resp = client.get(f"/roles/{role_id}", headers=_auth(token))
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "not_authorized"

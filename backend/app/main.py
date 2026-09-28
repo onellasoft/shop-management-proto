@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers import audit as audit_router
 from app.api.routers import auth as auth_router
+from app.api.routers import customers as customers_router
 from app.api.routers import impersonation as impersonation_router
 from app.api.routers import modules as modules_router
 from app.api.routers import roles as roles_router
@@ -81,6 +82,9 @@ def create_app() -> FastAPI:
 
     # Role management + permission catalog (Task 11.3, Req 7.2/7.3/7.4/7.5/5.1).
     app.include_router(roles_router.router)
+
+    # Customer & staff management (Phase A, Req 4.3/4.5).
+    app.include_router(customers_router.router)
 
     # Audit query + export (Task 22.3, Req 15.1/15.6).
     app.include_router(audit_router.router)
